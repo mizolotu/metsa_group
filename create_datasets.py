@@ -1,34 +1,34 @@
-import os, time
+import os, time, json
 import argparse as arp
 import os.path as osp
 import dateutil.parser as dparser
 import numpy as np
-import matplotlib.pyplot as pp
 import pandas as pd
 
-from sklearn.preprocessing import MinMaxScaler as mmscaler
-from sklearn.manifold import TSNE as tsne
+from itertools import chain, combinations
 from config import *
 
-def load_tags(fname):
+def load_tags(fname, remove_yellow=False):
     if fname in os.listdir(data_dir):
         p = pd.read_excel(osp.join(data_dir, fname))
         positions = p[position_column].values
-        non_yellow_indexes = np.array([i for i, p in enumerate(positions) if p not in yellow_tags])
-        positions = positions[non_yellow_indexes]
-        delay_classes = p[delay_class_column].values[non_yellow_indexes]
+        delay_classes = p[delay_class_column].values
+        if remove_yellow:
+            non_yellow_indexes = np.array([i for i, p in enumerate(positions) if p not in yellow_tags])
+            positions = positions[non_yellow_indexes]
+            delay_classes = delay_classes[non_yellow_indexes]
         unique_delay_classes = np.unique(delay_classes)
         tags = {}
         for i, unique_delay_class in enumerate(unique_delay_classes):
             idx = np.where(delay_classes == unique_delay_class)[0]
-            tags[unique_delay_class] = positions[idx]
+            tags[int(unique_delay_class)] = positions[idx].tolist()
     else:
         tags = None
     return tags
 
 def load_samples(fname):
-    if fname in os.listdir(data_dir):
-        p = pd.read_csv(osp.join(data_dir, fname))
+    if fname in os.listdir(raw_data_dir):
+        p = pd.read_csv(osp.join(raw_data_dir, fname))
         keys = p.keys().tolist()[1:]
         keys = [key.replace('_', '.') for key in keys]
         values = p.values[:, 1:]
@@ -37,55 +37,119 @@ def load_samples(fname):
         keys, values, timestamps = None, None, None
     return keys, values, timestamps
 
-def check_data(keys, tags):
-    tags = np.hstack(tags.values()).tolist()
-    for key in keys:
-        if key not in tags:
-            print(f'Tag {key} not found in tags!')
-    for tag in tags:
-        if tag not in keys:
-            print(f'Tag {tag} not found in keys!')
+def select_keys(keys, values, tags):
+    tags = np.hstack(list(tags.values()))
+    assert br_key in tags
+    assert br_key in keys
+    br_index = keys.index(br_key)
+    cols = [col for col, key in enumerate(keys) if key in tags and key != br_key]
+    return [keys[i] for i in cols], values[:, cols], values[:, br_index:br_index+1]
 
-def select_data(keys, values, timestamps):
-    return keys, values, timestamps
+def powerset(items):
+    return chain.from_iterable(combinations(items, r) for r in range(1, len(items)+1))
+
+def sort_by_delay_class(keys, values, tags, delay_classes):
+    key_indexes_sorted = []
+    nans = pd.isna(values)
+    for delay_class in delay_classes:
+        for tag in tags[delay_class]:
+            if tag in keys:
+                idx = keys.index(tag)
+                if np.any(nans[:, idx] == False):
+                    key_indexes_sorted.append(keys.index(tag))
+                else:
+                    print(f'No values in column {tag}?')
+    return [keys[i] for i in key_indexes_sorted], values[:, key_indexes_sorted]
+
+def select_values(values, labels, timestamps, tstart=None):
+    idx = np.argsort(timestamps)
+    values = values[idx, :]
+    timestamps = timestamps[idx]
+    if tstart is None:
+        idx = np.where((pd.isna(labels[:, 0]) == False) & (labels[:, 0] > 80.0))[0]
+    else:
+        idx = np.where(timestamps > tstart)[0]
+    return values[idx, :], labels[idx, :], timestamps[idx]
 
 if __name__ == '__main__':
 
     # parse args
 
     parser = arp.ArgumentParser(description='')
-    parser.add_argument('-s', '--samples', help='File with samples', default='samples_15062021.csv')
+    parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
+    parser.add_argument('-s', '--samples', help='File with samples', default='samples_16062021.csv')
+    parser.add_argument('-d', '--delays', help='Delay classes', nargs='+', default=[])
     args = parser.parse_args()
 
     # laod data
 
     tags = load_tags(tags_fname)
     keys, values, timestamps = load_samples(args.samples)
-    print(len(np.hstack(tags.values())), len(keys))
-    check_data(keys, tags)
-    keys, values, timestamps = select_samples(keys, values, timestamps)
+    keys, values, labels = select_keys(keys, values, tags)
+    values, labels, timestamps = select_values(values, labels, timestamps)
 
-    # filter data
+    # delay classes
+
+    dcs = sorted(tags.keys())
+    dc_list = []
+    if args.delays is None or len(args.delays) == 0:
+        for p in powerset(dcs):
+            dc_list.append(list(p))
+    else:
+        dc_list.append(args.delays)
+
+    # train, test, validation split
+
+    inds = np.arange(len(labels))
+    inds_splitted = [[] for _ in stages]
+    np.random.shuffle(inds)
+    val, remaining = np.split(inds, [int(validation_share * len(inds))])
+    tr, te = np.split(remaining, [int(train_test_ratio * len(remaining))])
+    inds_splitted[0] = tr
+    inds_splitted[1] = te
+    inds_splitted[2] = val
+
+    # bleach ratio limits
+
+    y_min = np.minimum(br_min, np.min(labels))
+    y_max = np.maximum(br_max, np.max(labels))
+
+    # meta
+
+    meta = {'tags': tags, 'xmin': {}, 'xmax': {}, 'ymin': y_min, 'ymax': y_max}
+
+    # output directory
+
+    if not osp.isdir(processed_data_dir):
+        os.mkdir(processed_data_dir)
+
+    # run through delay classes
+
+    for dc in dc_list:
+
+        # select columns based on delay classes
+
+        keys_, values_ = sort_by_delay_class(keys, values, tags, dc)
+        id = ','.join([str(item) for item in dc])
+
+        # standardize data
+
+        xmin = np.nanmin(values_, axis=0)
+        xmax = np.nanmax(values_, axis=0)
+        meta['xmin'][id] = xmin.tolist()
+        meta['xmax'][id] = xmax.tolist()
+        values_std = (values_ - xmin[None, :]) / (xmax[None, :] - xmin[None, :] + eps)
+        values_std[np.where(pd.isna(values_std))] = nan_value
+
+        for fi, stage in enumerate(stages):
+            fname = f'{args.task}_{id}_{stage}{csv}'
+            fpath = osp.join(processed_data_dir, fname)
+            data = np.hstack([values_std[inds_splitted[fi], :], labels[inds_splitted[fi]]])
+            pd.DataFrame(data).to_csv(fpath, header=False, mode='w', index=False)
+
+    meta_fpath = osp.join(processed_data_dir, f'{args.task}_metainfo.json')
+    with open(meta_fpath, 'w') as jf:
+        json.dump(meta, jf)
 
 
 
-    if keys is not None:
-
-        # standardize the data
-
-        scaler = mmscaler()
-        values_std = scaler.fit_transform(values)
-
-        # plot tsne
-
-        non_nan_br_idx = np.where(pd.isna(values_std[:, br_index]) == False)[0]
-        data_subset = values_std[non_nan_br_idx, :]
-        non_nan_col_ids = np.where(np.sum(pd.isna(data_subset), axis=0) == False)[0]
-        data_subset = data_subset[:, non_nan_col_ids]
-        print(f'Subset shape: {data_subset.shape}')
-        manifold = tsne(n_components=2, verbose=1, perplexity=40, n_iter=300)
-        tsne_results = manifold.fit_transform(data_subset)
-        pp.plot(tsne_results[:, 0], tsne_results[:, 1], 'o')
-        fig_name = f'tsne_{args.dataset.split(csv)[0]}{pdf}'
-        pp.savefig(osp.join(fig_dir, fig_name))
-        pp.close()
