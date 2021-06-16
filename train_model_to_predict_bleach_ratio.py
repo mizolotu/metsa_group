@@ -132,6 +132,7 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--delays', help='Delay classes', nargs='+', default=[])
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
+    parser.add_argument('-v', '--verbose', help='Verbose', default=False, type=bool)
     args = parser.parse_args()
 
     # cuda
@@ -203,7 +204,7 @@ if __name__ == '__main__':
         # create model
 
         model_type = locals()[args.model]
-        model, model_name = model_type(nfeatures, args.layers, args.neurons, ymin, ymax, print_summary=False)
+        model, model_name = model_type(nfeatures, args.layers, args.neurons, ymin, ymax, print_summary=args.verbose)
 
         # create model and results directories
 
@@ -222,7 +223,7 @@ if __name__ == '__main__':
             verbose=0,
             callbacks=[tf.keras.callbacks.EarlyStopping(
                 monitor='val_mse',
-                verbose=0,
+                verbose=args.verbose,
                 patience=patience,
                 mode='min',
                 restore_best_weights=True
