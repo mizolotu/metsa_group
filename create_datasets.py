@@ -10,7 +10,7 @@ from config import *
 
 def load_tags(fname, remove_yellow=False):
     if fname in os.listdir(data_dir):
-        p = pd.read_excel(osp.join(data_dir, fname))
+        p = pd.read_excel(osp.join(data_dir, fname), engine = 'openpyxl')
         positions = p[position_column].values
         delay_classes = p[delay_class_column].values
         if remove_yellow:
