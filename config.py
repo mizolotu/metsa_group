@@ -25,7 +25,7 @@ nan_value = -1
 
 seed = 0
 batch_size = 512
-epochs = 1000
+epochs = 20000
 patience = 10
 
 # other
