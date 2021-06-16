@@ -53,7 +53,7 @@ def mlp(nfeatures, nl, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4, pr
     outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
     outputs = outputs * (ymax - ymin) + ymin
     model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-    model.compile(loss=tf.keras.losses.MeanSquaredError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
+    model.compile(loss=tf.keras.losses.MeanSquaredError(), optimizer=tf.keras.optimizers.SGD(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
     if print_summary:
         model.summary()
     return model, 'mlp_{0}_{1}'.format(nh, nl)
@@ -156,7 +156,6 @@ if __name__ == '__main__':
 
         # train model
 
-        print('Training {0}'.format(model_name))
         model.fit(
             batches['train'],
             validation_data=batches['validate'],
@@ -189,6 +188,7 @@ if __name__ == '__main__':
 
         # save the results
 
+        print(f'Error: {error}')
         results = [str(error)]
         stats_path = osp.join(r_path, 'stats.csv')
         with open(stats_path, 'w') as f:
