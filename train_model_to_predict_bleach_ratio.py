@@ -74,7 +74,7 @@ def dense_block(x, nhidden):
     h = tf.keras.layers.Activation(activation='relu')(h)
     return h
 
-def res(nfeatures, nb, nh, ymin, ymax, dropout=0.5, lr=1e-4):
+def res(nfeatures, nb, nh, ymin, ymax, dropout=0.5, lr=1e-4, print_summary=False):
     inputs = tf.keras.layers.Input(shape=(nfeatures,))
     hidden = tf.keras.layers.Dense(nh)(inputs)
     for _ in range(nb):
@@ -86,6 +86,8 @@ def res(nfeatures, nb, nh, ymin, ymax, dropout=0.5, lr=1e-4):
     outputs = outputs * (ymax - ymin) + ymin
     model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
     model.compile(loss=tf.keras.losses.MeanSquaredError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
+    if print_summary:
+        model.summary()
     return model, 'res_{0}_{1}'.format(nb, nh)
 
 def attention_block(x, nh):
@@ -97,7 +99,7 @@ def attention_block(x, nh):
     h = tf.keras.layers.Multiply()([a, v])
     return h
 
-def att(nfeatures, nb, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4):
+def att(nfeatures, nb, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4, print_summary=False):
     inputs = tf.keras.layers.Input(shape=(nfeatures,))
     if batchnorm:
         hidden = tf.keras.layers.BatchNormalization()(inputs)
@@ -111,6 +113,8 @@ def att(nfeatures, nb, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4):
     outputs = outputs * (ymax - ymin) + ymin
     model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
     model.compile(loss=tf.keras.losses.MeanSquaredError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
+    if print_summary:
+        model.summary()
     return model, 'att_{0}_{1}'.format(nb, nh)
 
 if __name__ == '__main__':
