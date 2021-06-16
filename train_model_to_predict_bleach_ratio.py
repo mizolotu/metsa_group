@@ -220,10 +220,10 @@ if __name__ == '__main__':
             batches['train'],
             validation_data=batches['validate'],
             epochs=epochs,
-            verbose=0,
+            verbose=args.verbose,
             callbacks=[tf.keras.callbacks.EarlyStopping(
                 monitor='val_mse',
-                verbose=int(args.verbose),
+                verbose=0,
                 patience=patience,
                 mode='min',
                 restore_best_weights=True
