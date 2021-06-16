@@ -160,6 +160,7 @@ if __name__ == '__main__':
             batches['train'],
             validation_data=batches['validate'],
             epochs=epochs,
+            verbose=0,
             callbacks=[tf.keras.callbacks.EarlyStopping(
                 monitor='val_mse',
                 verbose=0,
