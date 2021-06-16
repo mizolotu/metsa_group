@@ -40,7 +40,7 @@ def regression_mapper(features, label, ymin, ymax):
     label = tf.clip_by_value(label, ymin, ymax)
     return features, label
 
-def mlp(nfeatures, nl, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=5e-5, print_summary=False):
+def mlp(nfeatures, nl, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4, print_summary=False):
     inputs = tf.keras.layers.Input(shape=(nfeatures,))
     if batchnorm:
         hidden = tf.keras.layers.BatchNormalization()(inputs)
@@ -74,7 +74,7 @@ def dense_block(x, nhidden):
     h = tf.keras.layers.Activation(activation='relu')(h)
     return h
 
-def res(nfeatures, nb, nh, ymin, ymax, dropout=0.5, lr=5e-5, print_summary=False):
+def res(nfeatures, nb, nh, ymin, ymax, dropout=0.5, lr=1e-4, print_summary=False):
     inputs = tf.keras.layers.Input(shape=(nfeatures,))
     hidden = tf.keras.layers.Dense(nh)(inputs)
     for _ in range(nb):
@@ -99,7 +99,7 @@ def attention_block(x, nh):
     h = tf.keras.layers.Multiply()([a, v])
     return h
 
-def att(nfeatures, nb, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=5e-5, print_summary=False):
+def att(nfeatures, nb, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4, print_summary=False):
     inputs = tf.keras.layers.Input(shape=(nfeatures,))
     if batchnorm:
         hidden = tf.keras.layers.BatchNormalization()(inputs)
