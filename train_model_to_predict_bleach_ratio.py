@@ -53,10 +53,65 @@ def mlp(nfeatures, nl, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4, pr
     outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
     outputs = outputs * (ymax - ymin) + ymin
     model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-    model.compile(loss=tf.keras.losses.MeanSquaredError(), optimizer=tf.keras.optimizers.SGD(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
+    model.compile(loss=tf.keras.losses.MeanSquaredError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
     if print_summary:
         model.summary()
     return model, 'mlp_{0}_{1}'.format(nh, nl)
+
+def identity_block(x, nhidden):
+    h = tf.keras.layers.Dense(nhidden)(x)
+    h = tf.keras.layers.BatchNormalization()(h)
+    h = tf.keras.layers.Add()([x, h])
+    h = tf.keras.layers.Activation(activation='relu')(h)
+    return h
+
+def dense_block(x, nhidden):
+    h = tf.keras.layers.Dense(nhidden)(x)
+    h = tf.keras.layers.BatchNormalization()(h)
+    s = tf.keras.layers.Dense(nhidden)(x)
+    s = tf.keras.layers.BatchNormalization()(s)
+    h = tf.keras.layers.Add()([s, h])
+    h = tf.keras.layers.Activation(activation='relu')(h)
+    return h
+
+def res(nfeatures, nb, nh, ymin, ymax, dropout=0.5, lr=1e-4):
+    inputs = tf.keras.layers.Input(shape=(nfeatures,))
+    hidden = tf.keras.layers.Dense(nh)(inputs)
+    for _ in range(nb):
+        hidden = identity_block(hidden, nh)
+        hidden = dense_block(hidden, nh)
+        if dropout is not None:
+            hidden = tf.keras.layers.Dropout(dropout)(hidden)
+    outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
+    outputs = outputs * (ymax - ymin) + ymin
+    model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
+    model.compile(loss=tf.keras.losses.MeanSquaredError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
+    return model, 'res_{0}_{1}'.format(nb, nh)
+
+def attention_block(x, nh):
+    q = tf.keras.layers.Dense(nh, use_bias=False)(x)
+    k = tf.keras.layers.Dense(nh, use_bias=False)(x)
+    v = tf.keras.layers.Dense(nh, use_bias=False)(x)
+    a = tf.keras.layers.Multiply()([q, k])
+    a = tf.keras.layers.Softmax(axis=-1)(a)
+    h = tf.keras.layers.Multiply()([a, v])
+    return h
+
+def att(nfeatures, nb, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4):
+    inputs = tf.keras.layers.Input(shape=(nfeatures,))
+    if batchnorm:
+        hidden = tf.keras.layers.BatchNormalization()(inputs)
+    else:
+        hidden = inputs
+    for _ in range(nb):
+        hidden = attention_block(hidden, nh)
+        if dropout is not None:
+            hidden = tf.keras.layers.Dropout(dropout)(hidden)
+    outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
+    outputs = outputs * (ymax - ymin) + ymin
+    model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
+    model.compile(loss=tf.keras.losses.MeanSquaredError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
+    return model, 'att_{0}_{1}'.format(nb, nh)
 
 if __name__ == '__main__':
 
