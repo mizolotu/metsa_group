@@ -223,7 +223,7 @@ if __name__ == '__main__':
             verbose=0,
             callbacks=[tf.keras.callbacks.EarlyStopping(
                 monitor='val_mse',
-                verbose=args.verbose,
+                verbose=int(args.verbose),
                 patience=patience,
                 mode='min',
                 restore_best_weights=True
