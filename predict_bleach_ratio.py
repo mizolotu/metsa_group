@@ -143,7 +143,7 @@ if __name__ == '__main__':
 
         model_type = locals()[args.model]
         model, model_name = model_type(nfeatures, args.layers, args.neurons, ymin, ymax)
-        model.summary()
+        #model.summary()
 
         # create model and results directories
 
