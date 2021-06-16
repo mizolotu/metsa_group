@@ -23,6 +23,7 @@ nan_value = -1
 
 # ml
 
+seed = 0
 batch_size = 512
 epochs = 1000
 patience = 10

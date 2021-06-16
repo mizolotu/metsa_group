@@ -98,6 +98,10 @@ if __name__ == '__main__':
     else:
         dc_list.append(args.delays)
 
+    # set seed for results reproduction
+
+    np.random.seed(seed)
+
     # train, test, validation split
 
     inds = np.arange(len(labels))

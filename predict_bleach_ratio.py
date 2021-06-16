@@ -40,7 +40,7 @@ def classification_mapper(features, label, ymin, ymax):
     label = tf.clip_by_value(label, ymin, ymax)
     return features, label
 
-def mlp(nfeatures, nl, nh, ymin, ymax, dropout=0.5, batchnorm=True, lr=5e-5):
+def mlp(nfeatures, nl, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4):
     inputs = tf.keras.layers.Input(shape=(nfeatures,))
     if batchnorm:
         hidden = tf.keras.layers.BatchNormalization()(inputs)
@@ -80,8 +80,7 @@ if __name__ == '__main__':
 
     # set seed for results reproduction
 
-    if args.seed is not None:
-        set_seeds(args.seed)
+    set_seeds(seed)
 
     # meta and standardization values
 
