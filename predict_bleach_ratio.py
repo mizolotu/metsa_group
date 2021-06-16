@@ -35,12 +35,12 @@ def set_seeds(seed):
     tf.random.set_seed(seed)
     np.random.seed(seed)
 
-def classification_mapper(features, label, ymin, ymax):
+def regression_mapper(features, label, ymin, ymax):
     features = tf.stack(list(features.values()), axis=-1)
     label = tf.clip_by_value(label, ymin, ymax)
     return features, label
 
-def mlp(nfeatures, nl, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4):
+def mlp(nfeatures, nl, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4, print_summary=False):
     inputs = tf.keras.layers.Input(shape=(nfeatures,))
     if batchnorm:
         hidden = tf.keras.layers.BatchNormalization()(inputs)
@@ -54,6 +54,8 @@ def mlp(nfeatures, nl, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4):
     outputs = outputs * (ymax - ymin) + ymin
     model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
     model.compile(loss=tf.keras.losses.MeanSquaredError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
+    if print_summary:
+        model.summary()
     return model, 'mlp_{0}_{1}'.format(nh, nl)
 
 if __name__ == '__main__':
@@ -99,7 +101,7 @@ if __name__ == '__main__':
 
     # mapper
 
-    cl_mapper = lambda x, y: classification_mapper(x, y, ymin=ymin, ymax=ymax)
+    mapper = lambda x, y: regression_mapper(x, y, ymin=ymin, ymax=ymax)
 
     # delay classes
 
@@ -137,13 +139,12 @@ if __name__ == '__main__':
 
         batches = {}
         for stage in stages:
-            batches[stage] = load_batches(fpaths[stage], batch_size, nfeatures).map(cl_mapper)
+            batches[stage] = load_batches(fpaths[stage], batch_size, nfeatures).map(mapper)
 
         # create model
 
         model_type = locals()[args.model]
-        model, model_name = model_type(nfeatures, args.layers, args.neurons, ymin, ymax)
-        #model.summary()
+        model, model_name = model_type(nfeatures, args.layers, args.neurons, ymin, ymax, print_summary=False)
 
         # create model and results directories
 
