@@ -175,7 +175,7 @@ if __name__ == '__main__':
 
     # results table
 
-    r_path = osp.join(task_results_dir, f'{task}_error.csv')
+    r_path = osp.join(task_results_dir, 'error.csv')
     try:
         p = pd.read_csv(r_path)
         if model_name not in p.keys():
