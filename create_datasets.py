@@ -77,7 +77,7 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-s', '--samples', help='File with samples', default='samples_16062021.csv')
+    parser.add_argument('-s', '--samples', help='File with samples', default='some_samples.csv')
     parser.add_argument('-d', '--delays', help='Delay classes', nargs='+', default=[])
     args = parser.parse_args()
 
@@ -120,7 +120,7 @@ if __name__ == '__main__':
 
     # meta
 
-    meta = {'tags': tags, 'xmin': {}, 'xmax': {}, 'ymin': y_min, 'ymax': y_max}
+    meta = {'tags': tags, 'ntrain': len(tr), 'nvalidate': len(val), 'ntest': len(te), 'xmin': {}, 'xmax': {}, 'ymin': y_min, 'ymax': y_max}
 
     # output directory
 
