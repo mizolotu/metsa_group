@@ -1,6 +1,6 @@
 import json, os
 import os.path as osp
-
+import pandas as pd
 import tensorflow as tf
 import numpy as np
 import argparse as arp
@@ -40,7 +40,7 @@ def regression_mapper(features, label, ymin, ymax):
     label = tf.clip_by_value(label, ymin, ymax)
     return features, label
 
-def mlp(nfeatures, nl, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4, print_summary=False):
+def mlp(nfeatures, nl, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4):
     inputs = tf.keras.layers.Input(shape=(nfeatures,))
     if batchnorm:
         hidden = tf.keras.layers.BatchNormalization()(inputs)
@@ -54,9 +54,7 @@ def mlp(nfeatures, nl, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4, pr
     outputs = outputs * (ymax - ymin) + ymin
     model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
     model.compile(loss=tf.keras.losses.MeanSquaredError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
-    if print_summary:
-        model.summary()
-    return model, 'mlp_{0}_{1}'.format(nh, nl)
+    return model
 
 def identity_block(x, nhidden):
     h = tf.keras.layers.Dense(nhidden)(x)
@@ -74,7 +72,7 @@ def dense_block(x, nhidden):
     h = tf.keras.layers.Activation(activation='relu')(h)
     return h
 
-def res(nfeatures, nb, nh, ymin, ymax, dropout=0.5, lr=1e-4, print_summary=False):
+def res(nfeatures, nb, nh, ymin, ymax, dropout=0.5, lr=1e-4):
     inputs = tf.keras.layers.Input(shape=(nfeatures,))
     hidden = tf.keras.layers.Dense(nh)(inputs)
     for _ in range(nb):
@@ -86,9 +84,7 @@ def res(nfeatures, nb, nh, ymin, ymax, dropout=0.5, lr=1e-4, print_summary=False
     outputs = outputs * (ymax - ymin) + ymin
     model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
     model.compile(loss=tf.keras.losses.MeanSquaredError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
-    if print_summary:
-        model.summary()
-    return model, 'res_{0}_{1}'.format(nb, nh)
+    return model
 
 def attention_block(x, nh):
     q = tf.keras.layers.Dense(nh, use_bias=False)(x)
@@ -99,7 +95,7 @@ def attention_block(x, nh):
     h = tf.keras.layers.Multiply()([a, v])
     return h
 
-def att(nfeatures, nb, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4, print_summary=False):
+def att(nfeatures, nb, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4):
     inputs = tf.keras.layers.Input(shape=(nfeatures,))
     if batchnorm:
         hidden = tf.keras.layers.BatchNormalization()(inputs)
@@ -113,9 +109,7 @@ def att(nfeatures, nb, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4, pr
     outputs = outputs * (ymax - ymin) + ymin
     model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
     model.compile(loss=tf.keras.losses.MeanSquaredError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
-    if print_summary:
-        model.summary()
-    return model, 'att_{0}_{1}'.format(nb, nh)
+    return model
 
 if __name__ == '__main__':
 
@@ -166,12 +160,31 @@ if __name__ == '__main__':
     # delay classes
 
     dcs = sorted(tags.keys())
-    dc_list = []
+    dc_combs = []
+    for p in powerset(dcs):
+        dc_combs.append(list(p))
     if args.delays is None or len(args.delays) == 0:
-        for p in powerset(dcs):
-            dc_list.append(list(p))
+        dc_list = dc_combs
     else:
-        dc_list.append(args.delays)
+        dc_list = [args.delays]
+
+    # model
+
+    model_type = locals()[args.model]
+    model_name = f'{args.model}_{args.layers}_{args.neurons}'
+
+    # results table
+
+    r_path = osp.join(task_results_dir, f'{task}_error.csv')
+    try:
+        p = pd.read_csv(r_path)
+        if model_name not in p.keys():
+            p[model_name] = [np.nan for comb in dc_combs]
+    except:
+        p = pd.DataFrame({
+            'Delay classes': [','.join([str(item) for item in comb]) for comb in dc_combs],
+            model_name: [np.nan for comb in dc_combs]
+        })
 
     # loop through delay class combinations
 
@@ -203,36 +216,43 @@ if __name__ == '__main__':
 
         # create model
 
-        model_type = locals()[args.model]
-        model, model_name = model_type(nfeatures, args.layers, args.neurons, ymin, ymax, print_summary=args.verbose)
+        model = model_type(nfeatures, args.layers, args.neurons, ymin, ymax)
+        if args.verbose:
+            model.summary()
 
         # create model and results directories
 
         m_path = osp.join(task_models_dir, f'{model_name}_{id}')
-        r_path = osp.join(task_results_dir, f'{model_name}_{id}')
-        for p in [m_path, r_path]:
-            if not osp.isdir(p):
-                os.mkdir(p)
+        if not osp.isdir(m_path):
+            os.mkdir(m_path)
 
-        # train model
+        # load model
 
-        model.fit(
-            batches['train'],
-            validation_data=batches['validate'],
-            epochs=epochs,
-            verbose=args.verbose,
-            callbacks=[tf.keras.callbacks.EarlyStopping(
-                monitor='val_mse',
-                verbose=0,
-                patience=patience,
-                mode='min',
-                restore_best_weights=True
-            )]
-        )
+        try:
+            model = tf.keras.models.load_model(m_path)
 
-        # save model
+        except Exception as e:
+            print(e)
 
-        model.save(m_path)
+            # train model
+
+            model.fit(
+                batches['train'],
+                validation_data=batches['validate'],
+                epochs=epochs,
+                verbose=args.verbose,
+                callbacks=[tf.keras.callbacks.EarlyStopping(
+                    monitor='val_mse',
+                    verbose=0,
+                    patience=patience,
+                    mode='min',
+                    restore_best_weights=True
+                )]
+            )
+
+            # save model
+
+            model.save(m_path)
 
         # predict and calculate inference statistics
 
@@ -249,7 +269,6 @@ if __name__ == '__main__':
         # save the results
 
         print(f'Error: {error}')
-        results = [str(error)]
-        stats_path = osp.join(r_path, 'stats.csv')
-        with open(stats_path, 'w') as f:
-            f.write(','.join(results))
+        idx = np.where(p['Delay classes'].values == id)[0]
+        p[model_name].values[idx] = error
+        p.to_csv(r_path, index=None)
