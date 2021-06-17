@@ -8,7 +8,9 @@ Python 3.8.5
 
 ### Installation
 
-pip3 install -r requirements
+1. Clone this repository
+2. Export bleach ratio data from Azure in csv format, name it for example "some_samples.csv", and place in directory ```bash data/raw```.
+3. pip3 install -r requirements
 
 ### How to use
 
