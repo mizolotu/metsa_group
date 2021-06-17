@@ -35,5 +35,5 @@ python3 test_models_to_predict_bleach_ratio.py -s <csv file with samples, e.g. m
 
 ### Results
 
-1. Prediction errors for different delay classes and different models can be found [here](results/predict_bleach_ratio/predict_bleach_ratio_error.csv)
+1. Prediction errors for different delay classes and different models can be found [here](results/predict_bleach_ratio/error.csv)
 2. Figures with train and validation errors during the training stage (TO DO)
