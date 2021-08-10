@@ -53,7 +53,7 @@ def mlp(nfeatures, nl, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4):
     outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
     outputs = outputs * (ymax - ymin) + ymin
     model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-    model.compile(loss=tf.keras.losses.MeanSquaredError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
+    model.compile(loss=tf.keras.losses.MeanAbsoluteError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
     return model
 
 def identity_block(x, nhidden):
@@ -122,10 +122,10 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Train classifiers')
     parser.add_argument('-m', '--model', help='Model', default='mlp')
     parser.add_argument('-l', '--layers', help='Number of layers', default=2, type=int)
-    parser.add_argument('-n', '--neurons', help='Number of neurons', default=512, type=int)
+    parser.add_argument('-n', '--neurons', help='Number of neurons', default=4096, type=int)
     parser.add_argument('-d', '--delays', help='Delay classes', nargs='+', default=[])
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
-    parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
+    parser.add_argument('-c', '--cuda', help='Use CUDA', default=True, type=bool)
     parser.add_argument('-v', '--verbose', help='Verbose', default=False, type=bool)
     args = parser.parse_args()
 
@@ -242,7 +242,7 @@ if __name__ == '__main__':
                 epochs=epochs,
                 verbose=args.verbose,
                 callbacks=[tf.keras.callbacks.EarlyStopping(
-                    monitor='val_mse',
+                    monitor='val_loss',
                     verbose=0,
                     patience=patience,
                     mode='min',
