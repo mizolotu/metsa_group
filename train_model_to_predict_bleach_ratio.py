@@ -40,13 +40,14 @@ def regression_mapper(features, label, ymin, ymax):
     label = tf.clip_by_value(label, ymin, ymax)
     return features, label
 
-def mlp(nfeatures, nl, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4):
+def mlp(nfeatures, nhiddens, xmin, xmax, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4):
     inputs = tf.keras.layers.Input(shape=(nfeatures,))
+    inputs_std = (inputs - xmin) / (xmax - xmin + eps)
     if batchnorm:
-        hidden = tf.keras.layers.BatchNormalization()(inputs)
+        hidden = tf.keras.layers.BatchNormalization()(inputs_std)
     else:
-        hidden = inputs
-    for _ in range(nl):
+        hidden = inputs_std
+    for nh in nhiddens:
         hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
         if dropout is not None:
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
@@ -113,20 +114,16 @@ def att(nfeatures, nb, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4):
 
 if __name__ == '__main__':
 
-    # task
-
-    task = 'predict_bleach_ratio'
-
     # args
 
     parser = arp.ArgumentParser(description='Train classifiers')
+    parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-m', '--model', help='Model', default='mlp')
-    parser.add_argument('-l', '--layers', help='Number of layers', default=2, type=int)
-    parser.add_argument('-n', '--neurons', help='Number of neurons', default=4096, type=int)
-    parser.add_argument('-d', '--delays', help='Delay classes', nargs='+', default=[])
+    parser.add_argument('-l', '--layers', help='Number of neurons in layers', default=[512, 512], type=int, nargs='+')
+    parser.add_argument('-d', '--delays', help='Delay classes', nargs='+', default=[1])
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=True, type=bool)
-    parser.add_argument('-v', '--verbose', help='Verbose', default=False, type=bool)
+    parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
     args = parser.parse_args()
 
     # cuda
@@ -140,15 +137,15 @@ if __name__ == '__main__':
 
     # meta and standardization values
 
-    meta = load_meta(processed_data_dir, task)
+    meta = load_meta(processed_data_dir, args.task)
     tags = meta['tags']
     ymin = meta['ymin']
     ymax = meta['ymax']
 
     # create output directories
 
-    task_models_dir = osp.join(models_dir, task)
-    task_results_dir = osp.join(results_dir, task)
+    task_models_dir = osp.join(models_dir, args.task)
+    task_results_dir = osp.join(results_dir, args.task)
     for d in [models_dir, task_models_dir, results_dir, task_results_dir]:
         if not osp.isdir(d):
             os.mkdir(d)
@@ -171,7 +168,7 @@ if __name__ == '__main__':
     # model
 
     model_type = locals()[args.model]
-    model_name = f'{args.model}_{args.layers}_{args.neurons}'
+    model_name = f"{args.model}_{'-'.join([str(item) for item in args.layers])}"
 
     # results table
 
@@ -206,7 +203,7 @@ if __name__ == '__main__':
 
         fpaths = {}
         for stage in stages:
-            fpaths[stage] = osp.join(processed_data_dir, f'{task}_{id}_{stage}{csv}')
+            fpaths[stage] = osp.join(processed_data_dir, f'{args.task}_{id}_{stage}{csv}')
 
         # batches
 
@@ -216,7 +213,7 @@ if __name__ == '__main__':
 
         # create model
 
-        model = model_type(nfeatures, args.layers, args.neurons, ymin, ymax)
+        model = model_type(nfeatures, args.layers, xmin, xmax, ymin, ymax)
         if args.verbose:
             model.summary()
 
@@ -259,7 +256,7 @@ if __name__ == '__main__':
         t_test = 0
         predictions = []
         reals = []
-        for x, y in batches['test']:
+        for x, y in batches['inference']:
             preds = model.predict(x)[:, 0]
             predictions = np.hstack([predictions, preds])
             reals = np.hstack([reals, y])

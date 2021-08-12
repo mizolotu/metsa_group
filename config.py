@@ -5,7 +5,7 @@ raw_data_dir = f'{data_dir}/raw'
 processed_data_dir = f'{data_dir}/features'
 models_dir = 'models'
 results_dir = 'results'
-fig_dir = 'figures'
+figures_dir = 'figures'
 tags_fname = 'tags.xlsx'
 
 # data
@@ -13,7 +13,7 @@ tags_fname = 'tags.xlsx'
 br_key = '126A0466-QI'
 br_min = 86.0
 br_max = 92.0
-stages = ['train', 'validate', 'test']
+stages = ['train', 'validate', 'inference']
 validation_share = 0.2
 train_test_ratio = 0.5
 yellow_tags = ['126A0159-HS', '126A0125-UI', '126A0164-UI', '126A7035-DLY', '126A7036-DLY', '126A7037-DLY']

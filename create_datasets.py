@@ -48,25 +48,24 @@ def select_keys(keys, values, tags):
 def powerset(items):
     return chain.from_iterable(combinations(items, r) for r in range(1, len(items)+1))
 
-def sort_by_delay_class(keys, values, tags, delay_classes):
+def sort_by_delay_class(keys, values, tags, delay_class):
     key_indexes_sorted = []
     nans = pd.isna(values)
-    for delay_class in delay_classes:
-        for tag in tags[delay_class]:
-            if tag in keys:
-                idx = keys.index(tag)
-                if np.any(nans[:, idx] == False):
-                    key_indexes_sorted.append(keys.index(tag))
-                else:
-                    print(f'No values in column {tag}?')
+    for tag in tags[delay_class]:
+        if tag in keys:
+            idx = keys.index(tag)
+            if np.any(nans[:, idx] == False):
+                key_indexes_sorted.append(keys.index(tag))
+            else:
+                print(f'No values in column {tag}?')
     return [keys[i] for i in key_indexes_sorted], values[:, key_indexes_sorted]
 
-def select_values(values, labels, timestamps, tstart=None):
+def select_values(values, labels, timestamps, tstart=None, label_thr=80.0):
     idx = np.argsort(timestamps)
     values = values[idx, :]
     timestamps = timestamps[idx]
     if tstart is None:
-        idx = np.where((pd.isna(labels[:, 0]) == False) & (labels[:, 0] > 80.0))[0]
+        idx = np.where((pd.isna(labels[:, 0]) == False) & (labels[:, 0] > label_thr))[0]
     else:
         idx = np.where(timestamps > tstart)[0]
     return values[idx, :], labels[idx, :], timestamps[idx]
@@ -120,7 +119,29 @@ if __name__ == '__main__':
 
     # meta
 
-    meta = {'tags': tags, 'ntrain': len(tr), 'nvalidate': len(val), 'ntest': len(te), 'xmin': {}, 'xmax': {}, 'ymin': y_min, 'ymax': y_max}
+    meta = {'tags': {}, 'ntrain': len(tr), 'nvalidate': len(val), 'ninference': len(te), 'xmin': {}, 'xmax': {}, 'ymin': y_min, 'ymax': y_max}
+
+    # process data for each delay class
+
+    values_by_delay_class = {}
+
+    for key in tags.keys():
+
+        # select tags and values for each delay class
+
+        keys_, values_ = sort_by_delay_class(keys, values, tags, key)
+        meta['tags'][key] = keys_
+
+        # substitute nan values
+
+        xmin = np.nanmin(values_, axis=0)
+        xmax = np.nanmax(values_, axis=0)
+        meta['xmin'][key] = xmin.tolist()
+        meta['xmax'][key] = xmax.tolist()
+        values_std = (values_ - xmin[None, :]) / (xmax[None, :] - xmin[None, :] + eps)
+        values_std[np.where(pd.isna(values_std))] = nan_value
+        values_no_nan = values_std * (xmax[None, :] - xmin[None, :]) + xmin[None, :]
+        values_by_delay_class[key] = values_no_nan
 
     # output directory
 
@@ -131,25 +152,22 @@ if __name__ == '__main__':
 
     for dc in dc_list:
 
-        # select columns based on delay classes
+        # stack data for each combination of tags
 
-        keys_, values_ = sort_by_delay_class(keys, values, tags, dc)
-        id = ','.join([str(item) for item in dc])
+        vals = []
+        for d in dc:
+            vals.append(values_by_delay_class[d])
+        vals = np.hstack(vals)
 
-        # standardize data
-
-        xmin = np.nanmin(values_, axis=0)
-        xmax = np.nanmax(values_, axis=0)
-        meta['xmin'][id] = xmin.tolist()
-        meta['xmax'][id] = xmax.tolist()
-        values_std = (values_ - xmin[None, :]) / (xmax[None, :] - xmin[None, :] + eps)
-        values_std[np.where(pd.isna(values_std))] = nan_value
+        # save datasets
 
         for fi, stage in enumerate(stages):
             fname = f'{args.task}_{id}_{stage}{csv}'
             fpath = osp.join(processed_data_dir, fname)
-            data = np.hstack([values_std[inds_splitted[fi], :], labels[inds_splitted[fi]]])
+            data = np.hstack([vals[inds_splitted[fi], :], labels[inds_splitted[fi]]])
             pd.DataFrame(data).to_csv(fpath, header=False, mode='w', index=False)
+
+    # save meta
 
     meta_fpath = osp.join(processed_data_dir, f'{args.task}_metainfo.json')
     with open(meta_fpath, 'w') as jf:
