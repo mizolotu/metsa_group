@@ -1,14 +1,14 @@
-import json, os
+import os
 import os.path as osp
 import pandas as pd
-import tensorflow as tf
 import numpy as np
 import argparse as arp
 
-from sklearn.feature_selection import f_regression
 from scipy.stats import spearmanr
 from config import *
 from train_model_to_predict_bleach_ratio import set_seeds, load_meta
+from matplotlib import pyplot as pp
+from matplotlib.lines import Line2D
 
 if __name__ == '__main__':
 
@@ -35,8 +35,13 @@ if __name__ == '__main__':
         if not osp.isdir(dir):
             os.mkdir(dir)
 
-    fv_list, dc_list, tag_list = [], [], []
+    pc_list, sr_list, dc_list, tag_list = [], [], [], []
     for tag_key in tags.keys():
+
+        # delay classes and tags
+
+        dc_list.extend([tag_key for _ in tags[tag_key]])
+        tag_list.extend(tags[tag_key])
 
         # collect data
 
@@ -51,16 +56,60 @@ if __name__ == '__main__':
 
         X = vals[:, :-1]
         y = vals[:, -1]
-        f_values, p_values = f_regression(X, y)
-        s_ranks = spearmanr(X, y)
-        print(tag_key,X.shape,s_ranks)
-        for tag, f_value in zip(tags[tag_key], f_values):
-            dc_list.append(tag_key)
-            tag_list.append(tag)
-            fv_list.append(f_value)
 
+        # pearson correlation
 
+        nfeatures = X.shape[1]
+        pearson_corr = np.zeros(nfeatures)
+        for i in range(nfeatures):
+            pearson_corr[i] = np.abs(np.corrcoef(X[:, i], y)[0, 1])
+        pc_list.append(pearson_corr)
 
+        # spearman correlation
 
+        s_ranks, _ = spearmanr(X, y)
+        spearman_corr = np.abs(s_ranks[:-1, -1])
+        sr_list.append(spearman_corr)
 
+    # arrays
 
+    tags = np.array(tag_list)
+    dcs = np.array(dc_list, dtype=int)
+    pcs = np.hstack(pc_list)
+    srs = np.hstack(sr_list)
+
+    # plot stats
+
+    unique_colors = np.array(['darkviolet', 'royalblue', 'seagreen', 'gold', 'firebrick'])
+    legend_items = [Line2D([0], [0], color=color) for color in unique_colors]
+    legend_names = [f'Delay class {dc}' for dc in np.unique(dcs)]
+    color_idx = dcs - 1
+    colors = unique_colors[color_idx]
+
+    # pc plot
+
+    fpath = osp.join(task_figures_dir, 'pearson.pdf')
+    idx = np.argsort(pcs)[::-1]
+    items = tags[idx]
+    h = pcs[idx]
+    c = colors[idx]
+    pp.bar(items, height=h, color=c)
+    pp.xticks(fontsize=3, rotation='vertical')
+    pp.yticks(fontsize=5)
+    pp.legend(legend_items, legend_names, prop={'size': 5})
+    pp.savefig(fpath)
+    pp.close()
+
+    # sr plot
+
+    fpath = osp.join(task_figures_dir, 'spearman.pdf')
+    idx = np.argsort(srs)[::-1]
+    items = tags[idx]
+    h = srs[idx]
+    c = colors[idx]
+    pp.bar(items, height=h, color=c)
+    pp.xticks(fontsize=3, rotation='vertical')
+    pp.yticks(fontsize=5)
+    pp.legend(legend_items, legend_names, prop={'size': 5})
+    pp.savefig(fpath)
+    pp.close()

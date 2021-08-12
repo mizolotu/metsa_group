@@ -77,7 +77,7 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-s', '--samples', help='File with samples', default='some_samples.csv')
-    parser.add_argument('-d', '--delays', help='Delay classes', nargs='+', default=[])
+    parser.add_argument('-d', '--delays', help='Delay classes', nargs='+', type=int, default=[])
     args = parser.parse_args()
 
     # laod data
@@ -161,6 +161,7 @@ if __name__ == '__main__':
 
         # save datasets
 
+        id = ','.join([str(item) for item in dc])
         for fi, stage in enumerate(stages):
             fname = f'{args.task}_{id}_{stage}{csv}'
             fpath = osp.join(processed_data_dir, fname)

@@ -120,7 +120,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-m', '--model', help='Model', default='mlp')
     parser.add_argument('-l', '--layers', help='Number of neurons in layers', default=[512, 512], type=int, nargs='+')
-    parser.add_argument('-d', '--delays', help='Delay classes', nargs='+', default=[1])
+    parser.add_argument('-d', '--delays', help='Delay classes', nargs='+', default=[])
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=True, type=bool)
     parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
@@ -139,6 +139,8 @@ if __name__ == '__main__':
 
     meta = load_meta(processed_data_dir, args.task)
     tags = meta['tags']
+    xmin = meta['xmin']
+    xmax = meta['xmax']
     ymin = meta['ymin']
     ymax = meta['ymax']
 
@@ -164,6 +166,7 @@ if __name__ == '__main__':
         dc_list = dc_combs
     else:
         dc_list = [args.delays]
+    print(dc_list)
 
     # model
 
@@ -189,18 +192,20 @@ if __name__ == '__main__':
 
         print(f'Training using delay classes {dc}')
 
-        # load correct data from metainfo
+        # xmin and xmax
 
-        id = ','.join([str(item) for item in dc])
-        assert id in meta['xmin'].keys()
-        assert id in meta['xmax'].keys()
-        xmin = np.array(meta['xmin'][id])
-        xmax = np.array(meta['xmax'][id])
+        xmin, xmax = [], []
+        for item in dc:
+            xmin.append(meta['xmin'][item])
+            xmax.append(meta['xmax'][item])
+        xmin = np.hstack(xmin)
+        xmax = np.hstack(xmax)
         nfeatures = len(xmin)
         assert len(xmax) == nfeatures
 
         # fpath
 
+        id = ','.join([str(item) for item in dc])
         fpaths = {}
         for stage in stages:
             fpaths[stage] = osp.join(processed_data_dir, f'{args.task}_{id}_{stage}{csv}')
