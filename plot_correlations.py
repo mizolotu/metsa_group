@@ -6,7 +6,7 @@ import argparse as arp
 
 from scipy.stats import spearmanr
 from config import *
-from train_model_to_predict_bleach_ratio import set_seeds, load_meta
+from train_model import set_seeds, load_meta
 from matplotlib import pyplot as pp
 from matplotlib.lines import Line2D
 
@@ -23,7 +23,7 @@ if __name__ == '__main__':
 
     set_seeds(seed)
 
-    # meta and standardization values
+    # meta
 
     meta = load_meta(processed_data_dir, args.task)
     tags = meta['tags']
@@ -88,28 +88,32 @@ if __name__ == '__main__':
 
     # pc plot
 
-    fpath = osp.join(task_figures_dir, 'pearson.pdf')
+    fpath = osp.join(task_figures_dir, 'pearson_by_tag.pdf')
     idx = np.argsort(pcs)[::-1]
     items = tags[idx]
     h = pcs[idx]
     c = colors[idx]
     pp.bar(items, height=h, color=c)
-    pp.xticks(fontsize=3, rotation='vertical')
-    pp.yticks(fontsize=5)
-    pp.legend(legend_items, legend_names, prop={'size': 5})
+    pp.xlabel('Tag name', fontdict={'size': 4})
+    pp.ylabel('Correlation with bleach ratio', fontdict={'size': 4})
+    pp.xticks(fontsize=2, rotation='vertical')
+    pp.yticks(fontsize=4)
+    pp.legend(legend_items, legend_names, prop={'size': 4})
     pp.savefig(fpath)
     pp.close()
 
     # sr plot
 
-    fpath = osp.join(task_figures_dir, 'spearman.pdf')
+    fpath = osp.join(task_figures_dir, 'spearman_by_tag.pdf')
     idx = np.argsort(srs)[::-1]
     items = tags[idx]
     h = srs[idx]
     c = colors[idx]
     pp.bar(items, height=h, color=c)
-    pp.xticks(fontsize=3, rotation='vertical')
-    pp.yticks(fontsize=5)
-    pp.legend(legend_items, legend_names, prop={'size': 5})
+    pp.xlabel('Tag name', fontdict={'size': 4})
+    pp.ylabel('Correlation with bleach ratio', fontdict={'size': 4})
+    pp.xticks(fontsize=2, rotation='vertical')
+    pp.yticks(fontsize=4)
+    pp.legend(legend_items, legend_names, prop={'size': 4})
     pp.savefig(fpath)
     pp.close()
