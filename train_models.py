@@ -8,7 +8,7 @@ import argparse as arp
 from create_datasets import powerset
 from config import *
 
-def load_batches(path, tags, batch_size, nfeatures):
+def load_batches(path, tags, batch_size):
     batches = tf.data.experimental.make_csv_dataset(
         path,
         batch_size=batch_size,
@@ -194,20 +194,20 @@ if __name__ == '__main__':
 
         if not args.reverse:
             tags_selected = [tag]
-            xmin = xmin[tag_idx : tag_idx + 1]
-            xmax = xmax[tag_idx : tag_idx + 1]
+            xmin_selected = xmin[tag_idx : tag_idx + 1]
+            xmax_selected = xmax[tag_idx : tag_idx + 1]
             print(f'Training using tag {tag}')
             m_name = f'{model_name}_{tag}'
         else:
             tags_selected = tags_.copy()
             tags_selected.remove(tag)
-            xmin = np.hstack([xmin[: tag_idx], xmin[tag_idx + 1 :]])
-            xmax = np.hstack([xmax[: tag_idx], xmax[tag_idx + 1 :]])
+            xmin_selected = np.hstack([xmin[: tag_idx], xmin[tag_idx + 1 :]])
+            xmax_selected = np.hstack([xmax[: tag_idx], xmax[tag_idx + 1 :]])
             print(f'Training using all but tag {tag}')
             m_name = f'{model_name}_not-{tag}'
 
-        nfeatures = len(xmin)
-        assert len(xmax) == nfeatures
+        nfeatures = len(xmin_selected)
+        assert len(xmin_selected) == nfeatures
 
         # fpath
 
@@ -220,11 +220,11 @@ if __name__ == '__main__':
         tags_and_label = tags_selected + [br_key]
         batches = {}
         for stage in stages:
-            batches[stage] = load_batches(fpaths[stage], tags_and_label, batch_size, nfeatures).map(mapper)
+            batches[stage] = load_batches(fpaths[stage], tags_and_label, batch_size).map(mapper)
 
         # create model
 
-        model = model_type(nfeatures, args.layers, xmin, xmax, ymin, ymax)
+        model = model_type(nfeatures, args.layers, xmin_selected, xmax_selected, ymin, ymax)
         if args.verbose:
             model.summary()
 
