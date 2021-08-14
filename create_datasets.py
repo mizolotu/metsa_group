@@ -103,8 +103,8 @@ if __name__ == '__main__':
 
     # bleach ratio limits
 
-    y_min = np.minimum(br_min, np.min(labels))
-    y_max = np.maximum(br_max, np.max(labels))
+    y_min = np.maximum(br_min, np.min(labels))
+    y_max = np.minimum(br_max, np.max(labels))
 
     # meta
 
@@ -156,6 +156,3 @@ if __name__ == '__main__':
     meta_fpath = osp.join(processed_data_dir, f'{args.task}_metainfo.json')
     with open(meta_fpath, 'w') as jf:
         json.dump(meta, jf)
-
-
-

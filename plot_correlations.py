@@ -38,7 +38,7 @@ if __name__ == '__main__':
     # delay classes and tags
 
     dc_list, tag_list = [], []
-    for key in tags.keys():
+    for key in sorted(tags.keys()):
         dc_list.extend([key for _ in tags[key]])
         tag_list.extend(tags[key])
     tags = np.array(tag_list)
