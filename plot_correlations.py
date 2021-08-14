@@ -6,7 +6,7 @@ import argparse as arp
 
 from scipy.stats import spearmanr
 from config import *
-from train_model import set_seeds, load_meta
+from train_models import set_seeds, load_meta
 from matplotlib import pyplot as pp
 from matplotlib.lines import Line2D
 
@@ -35,48 +35,37 @@ if __name__ == '__main__':
         if not osp.isdir(dir):
             os.mkdir(dir)
 
-    pc_list, sr_list, dc_list, tag_list = [], [], [], []
-    for tag_key in tags.keys():
+    # delay classes and tags
 
-        # delay classes and tags
-
-        dc_list.extend([tag_key for _ in tags[tag_key]])
-        tag_list.extend(tags[tag_key])
-
-        # collect data
-
-        vals = []
-        for stage in stages:
-            fpath = osp.join(processed_data_dir, f'{args.task}_{tag_key}_{stage}{csv}')
-            p = pd.read_csv(fpath, header=None)
-            vals.append(p.values)
-        vals = np.vstack(vals)
-
-        # calculate correlation coefficients
-
-        X = vals[:, :-1]
-        y = vals[:, -1]
-
-        # pearson correlation
-
-        nfeatures = X.shape[1]
-        pearson_corr = np.zeros(nfeatures)
-        for i in range(nfeatures):
-            pearson_corr[i] = np.abs(np.corrcoef(X[:, i], y)[0, 1])
-        pc_list.append(pearson_corr)
-
-        # spearman correlation
-
-        s_ranks, _ = spearmanr(X, y)
-        spearman_corr = np.abs(s_ranks[:-1, -1])
-        sr_list.append(spearman_corr)
-
-    # arrays
-
+    dc_list, tag_list = [], []
+    for key in tags.keys():
+        dc_list.extend([key for _ in tags[key]])
+        tag_list.extend(tags[key])
     tags = np.array(tag_list)
     dcs = np.array(dc_list, dtype=int)
-    pcs = np.hstack(pc_list)
-    srs = np.hstack(sr_list)
+
+    # load data
+
+    vals = []
+    for stage in stages:
+        fpath = osp.join(processed_data_dir, f'{args.task}_{stage}{csv}')
+        p = pd.read_csv(fpath, header=None)
+        vals.append(p.values)
+    vals = np.vstack(vals)
+    X = vals[:, :-1]
+    y = vals[:, -1]
+    nfeatures = X.shape[1]
+
+    # pearson correlation
+
+    pearson_corr = np.zeros(nfeatures)
+    for i in range(nfeatures):
+        pearson_corr[i] = np.abs(np.corrcoef(X[:, i], y)[0, 1])
+
+    # spearman correlation
+
+    s_ranks, _ = spearmanr(X, y)
+    spearman_corr = np.abs(s_ranks[:-1, -1])
 
     # plot stats
 
@@ -89,9 +78,9 @@ if __name__ == '__main__':
     # pc plot
 
     fpath = osp.join(task_figures_dir, 'pearson_by_tag.pdf')
-    idx = np.argsort(pcs)[::-1]
+    idx = np.argsort(pearson_corr)[::-1]
     items = tags[idx]
-    h = pcs[idx]
+    h = pearson_corr[idx]
     c = colors[idx]
     pp.bar(items, height=h, color=c)
     pp.xlabel('Tag name', fontdict={'size': 4})
@@ -105,9 +94,9 @@ if __name__ == '__main__':
     # sr plot
 
     fpath = osp.join(task_figures_dir, 'spearman_by_tag.pdf')
-    idx = np.argsort(srs)[::-1]
+    idx = np.argsort(spearman_corr)[::-1]
     items = tags[idx]
-    h = srs[idx]
+    h = spearman_corr[idx]
     c = colors[idx]
     pp.bar(items, height=h, color=c)
     pp.xlabel('Tag name', fontdict={'size': 4})

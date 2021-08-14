@@ -48,10 +48,10 @@ def select_keys(keys, values, tags):
 def powerset(items):
     return chain.from_iterable(combinations(items, r) for r in range(1, len(items)+1))
 
-def sort_by_delay_class(keys, values, tags, delay_class):
+def sort_by_delay_class(keys, values, tags):
     key_indexes_sorted = []
     nans = pd.isna(values)
-    for tag in tags[delay_class]:
+    for tag in tags:
         if tag in keys:
             idx = keys.index(tag)
             if np.any(nans[:, idx] == False):
@@ -77,7 +77,6 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-s', '--samples', help='File with samples', default='some_samples.csv')
-    parser.add_argument('-d', '--delays', help='Delay classes', nargs='+', type=int, default=[])
     args = parser.parse_args()
 
     # laod data
@@ -86,16 +85,6 @@ if __name__ == '__main__':
     keys, values, timestamps = load_samples(args.samples)
     keys, values, labels = select_keys(keys, values, tags)
     values, labels, timestamps = select_values(values, labels, timestamps)
-
-    # delay classes
-
-    dcs = sorted(tags.keys())
-    dc_list = []
-    if args.delays is None or len(args.delays) == 0:
-        for p in powerset(dcs):
-            dc_list.append(list(p))
-    else:
-        dc_list.append(args.delays)
 
     # set seed for results reproduction
 
@@ -119,54 +108,48 @@ if __name__ == '__main__':
 
     # meta
 
-    meta = {'tags': {}, 'ntrain': len(tr), 'nvalidate': len(val), 'ninference': len(te), 'xmin': {}, 'xmax': {}, 'ymin': y_min, 'ymax': y_max}
-
-    # process data for each delay class
-
-    values_by_delay_class = {}
-
-    for key in tags.keys():
-
-        # select tags and values for each delay class
-
-        keys_, values_ = sort_by_delay_class(keys, values, tags, key)
-        meta['tags'][key] = keys_
-
-        # substitute nan values
-
-        xmin = np.nanmin(values_, axis=0)
-        xmax = np.nanmax(values_, axis=0)
-        meta['xmin'][key] = xmin.tolist()
-        meta['xmax'][key] = xmax.tolist()
-        values_std = (values_ - xmin[None, :]) / (xmax[None, :] - xmin[None, :] + eps)
-        values_std[np.where(pd.isna(values_std))] = nan_value
-        values_no_nan = values_std * (xmax[None, :] - xmin[None, :]) + xmin[None, :]
-        values_by_delay_class[key] = values_no_nan
+    meta = {'tags': {}, 'ntrain': len(tr), 'nvalidate': len(val), 'ninference': len(te), 'xmin': [], 'xmax': [], 'ymin': y_min, 'ymax': y_max}
 
     # output directory
 
     if not osp.isdir(processed_data_dir):
         os.mkdir(processed_data_dir)
 
-    # run through delay classes
+    # process data for each delay class
 
-    for dc in dc_list:
+    tag_names = []
+    vals = []
 
-        # stack data for each combination of tags
+    for key in tags.keys():
 
-        vals = []
-        for d in dc:
-            vals.append(values_by_delay_class[d])
-        vals = np.hstack(vals)
+        # select tags and values for each delay class
 
-        # save datasets
+        keys_, values_ = sort_by_delay_class(keys, values, tags[key])
+        meta['tags'][key] = keys_
+        tag_names.extend(keys_)
 
-        id = ','.join([str(item) for item in dc])
-        for fi, stage in enumerate(stages):
-            fname = f'{args.task}_{id}_{stage}{csv}'
-            fpath = osp.join(processed_data_dir, fname)
-            data = np.hstack([vals[inds_splitted[fi], :], labels[inds_splitted[fi]]])
-            pd.DataFrame(data).to_csv(fpath, header=False, mode='w', index=False)
+        # substitute nan values
+
+        xmin = np.nanmin(values_, axis=0)
+        xmax = np.nanmax(values_, axis=0)
+        meta['xmin'].append(xmin)
+        meta['xmax'].append(xmax)
+        values_std = (values_ - xmin[None, :]) / (xmax[None, :] - xmin[None, :] + eps)
+        values_std[np.where(pd.isna(values_std))] = nan_value
+        values_no_nan = values_std * (xmax[None, :] - xmin[None, :]) + xmin[None, :]
+        vals.append(values_no_nan)
+    tag_names.append(br_key)
+    vals = np.hstack(vals)
+    meta['xmin'] = np.hstack(meta['xmin']).tolist()
+    meta['xmax'] = np.hstack(meta['xmax']).tolist()
+
+    # save datasets
+
+    for fi, stage in enumerate(stages):
+        fname = f'{args.task}_{stage}{csv}'
+        fpath = osp.join(processed_data_dir, fname)
+        data = np.hstack([vals[inds_splitted[fi], :], labels[inds_splitted[fi]]])
+        pd.DataFrame(data, columns=tag_names).to_csv(fpath, mode='w', index=False)
 
     # save meta
 

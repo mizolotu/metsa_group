@@ -7,6 +7,8 @@ models_dir = 'models'
 results_dir = 'results'
 figures_dir = 'figures'
 tags_fname = 'tags.xlsx'
+error_by_tag_csv = 'error_by_tag.csv'
+error_by_not_tag_csv = 'error_by_not_tag.csv'
 
 # data
 
