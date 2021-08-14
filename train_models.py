@@ -125,7 +125,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=True, type=bool)
     parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
-    parser.add_argument('-r', '--reverse', help='All but the tag selected', default=True, type=bool)
+    parser.add_argument('-r', '--reverse', help='All but the tag selected', default=False, type=bool)
     args = parser.parse_args()
 
     # cuda
