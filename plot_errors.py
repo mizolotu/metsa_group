@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import argparse as arp
 
-from train_models import load_meta
+from calculate_error_by_tag import load_meta
 from config import *
 from matplotlib import pyplot as pp
 from matplotlib.lines import Line2D

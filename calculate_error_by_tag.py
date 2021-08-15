@@ -5,20 +5,14 @@ import tensorflow as tf
 import numpy as np
 import argparse as arp
 
-from create_datasets import powerset
 from config import *
 
 def load_batches(path, tags, batch_size):
     batches = tf.data.experimental.make_csv_dataset(
         path,
         batch_size=batch_size,
-        #header=False,
         shuffle=True,
-        #column_names=[str(i) for i in range(nfeatures + 1)],
-        #column_defaults=[tf.float32 for _ in range(nfeatures + 1)],
-        #select_columns=[str(i) for i in range(nfeatures + 1)],
         select_columns=tags,
-        #label_name='{0}'.format(nfeatures),
         label_name=tags[-1],
         num_epochs=1
     )
@@ -42,7 +36,7 @@ def regression_mapper(features, label, ymin, ymax):
     label = tf.clip_by_value(label, ymin, ymax)
     return features, label
 
-def mlp(nfeatures, nhiddens, xmin, xmax, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4):
+def mlp(nfeatures, nhiddens, xmin, xmax, ymin, ymax, dropout=0.1, batchnorm=True, lr=1e-4):
     inputs = tf.keras.layers.Input(shape=(nfeatures,))
     inputs_std = (inputs - xmin) / (xmax - xmin + eps)
     if batchnorm:
@@ -183,8 +177,8 @@ if __name__ == '__main__':
             model_name: [np.nan for _ in tags_]
         })
 
-    # loop through delay class combinations
 
+    # loop through tags
 
     for tag in tags_:
 
