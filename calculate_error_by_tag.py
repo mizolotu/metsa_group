@@ -36,7 +36,7 @@ def regression_mapper(features, label, ymin, ymax):
     label = tf.clip_by_value(label, ymin, ymax)
     return features, label
 
-def mlp(nfeatures, nhiddens, xmin, xmax, ymin, ymax, dropout=0.1, batchnorm=True, lr=1e-4):
+def mlp(nfeatures, nhiddens, xmin, xmax, ymin, ymax, dropout=0.5, batchnorm=True, lr=2.5e-4):
     inputs = tf.keras.layers.Input(shape=(nfeatures,))
     inputs_std = (inputs - xmin) / (xmax - xmin + eps)
     if batchnorm:
