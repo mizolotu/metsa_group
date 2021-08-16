@@ -1,4 +1,4 @@
-import json, os
+import os
 import os.path as osp
 import pandas as pd
 import tensorflow as tf
@@ -124,7 +124,7 @@ if __name__ == '__main__':
 
     # results table
 
-    r_name = error_by_tag_permutation_csv
+    r_name = permutation_error_csv
     r_path = osp.join(task_results_dir, r_name)
     try:
         p = pd.read_csv(r_path)

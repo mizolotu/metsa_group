@@ -20,7 +20,7 @@ def plot_bars(tags, heights, colors, items_for_argsort, fname, reverse=False):
     c = colors[idx]
     pp.bar(items, height=h, color=c)
     pp.xlabel('Tag name', fontdict={'size': 4})
-    pp.ylabel('Correlation with bleach ratio', fontdict={'size': 4})
+    pp.ylabel('Feature importance', fontdict={'size': 4})
     pp.xticks(fontsize=2, rotation='vertical')
     pp.yticks(fontsize=4)
     pp.legend(legend_items, legend_names, prop={'size': 4})
