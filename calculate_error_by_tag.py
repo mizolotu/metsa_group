@@ -31,12 +31,13 @@ def set_seeds(seed):
     tf.random.set_seed(seed)
     np.random.seed(seed)
 
-def regression_mapper(features, label, ymin, ymax):
+def regression_mapper(features, label):
     features = tf.stack(list(features.values()), axis=-1)
-    label = tf.clip_by_value(label, ymin, ymax)
     return features, label
 
 def mlp(nfeatures, nhiddens, xmin, xmax, ymin, ymax, dropout=0.5, batchnorm=True, lr=2.5e-4):
+    if type(nfeatures) is list:
+        nfeatures = np.sum(nfeatures)
     inputs = tf.keras.layers.Input(shape=(nfeatures,))
     inputs_std = (inputs - xmin) / (xmax - xmin + eps)
     if batchnorm:
@@ -75,31 +76,6 @@ def res(nfeatures, nb, nh, ymin, ymax, dropout=0.5, lr=1e-4):
     for _ in range(nb):
         hidden = identity_block(hidden, nh)
         hidden = dense_block(hidden, nh)
-        if dropout is not None:
-            hidden = tf.keras.layers.Dropout(dropout)(hidden)
-    outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
-    outputs = outputs * (ymax - ymin) + ymin
-    model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-    model.compile(loss=tf.keras.losses.MeanSquaredError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
-    return model
-
-def attention_block(x, nh):
-    q = tf.keras.layers.Dense(nh, use_bias=False)(x)
-    k = tf.keras.layers.Dense(nh, use_bias=False)(x)
-    v = tf.keras.layers.Dense(nh, use_bias=False)(x)
-    a = tf.keras.layers.Multiply()([q, k])
-    a = tf.keras.layers.Softmax(axis=-1)(a)
-    h = tf.keras.layers.Multiply()([a, v])
-    return h
-
-def att(nfeatures, nb, nh, ymin, ymax, dropout=0.5, batchnorm=False, lr=1e-4):
-    inputs = tf.keras.layers.Input(shape=(nfeatures,))
-    if batchnorm:
-        hidden = tf.keras.layers.BatchNormalization()(inputs)
-    else:
-        hidden = inputs
-    for _ in range(nb):
-        hidden = attention_block(hidden, nh)
         if dropout is not None:
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
     outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
@@ -154,7 +130,7 @@ if __name__ == '__main__':
 
     # mapper
 
-    mapper = lambda x, y: regression_mapper(x, y, ymin=ymin, ymax=ymax)
+    mapper = lambda x, y: regression_mapper(x, y)
 
     # model
 
