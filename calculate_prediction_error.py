@@ -95,7 +95,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
     parser.add_argument('-v', '--verbose', help='Verbose', default=False, type=bool)
-    parser.add_argument('-r', '--reverse', help='All but the tag selected', default=False, type=bool)
+    parser.add_argument('-e', '--evalmethod', help='Evaluation method', choices=['selected', 'not-selected', 'permuted'], default='permuted')
     args = parser.parse_args()
 
     # cuda
@@ -120,6 +120,10 @@ if __name__ == '__main__':
     ymin = meta['ymin']
     ymax = meta['ymax']
 
+    # load data
+
+
+
     # create output directories
 
     task_models_dir = osp.join(models_dir, args.task)
@@ -138,21 +142,18 @@ if __name__ == '__main__':
     model_name = f"{args.model}_{'-'.join([str(item) for item in args.layers])}"
 
     # results table
-    if not args.reverse:
-        r_name = error_by_tag_csv
-    else:
-        r_name = error_by_not_tag_csv
+
+    r_name = prediction_error_csv
     r_path = osp.join(task_results_dir, r_name)
     try:
         p = pd.read_csv(r_path)
-        if model_name not in p.keys():
-            p[model_name] = [np.nan for tag in tags_]
+        if args.evalmethod not in p.keys():
+            p[args.evalmethod] = [np.nan for tag in tags_]
     except:
         p = pd.DataFrame({
             'Tags': [tag for tag in tags_],
-            model_name: [np.nan for _ in tags_]
+            args.evalmethod: [np.nan for _ in tags_]
         })
-
 
     # loop through tags
 
@@ -162,19 +163,22 @@ if __name__ == '__main__':
 
         tag_idx = tags_.index(tag)
 
-        if not args.reverse:
+        if args.evalmethod == 'selected':
             tags_selected = [tag]
             xmin_selected = xmin[tag_idx : tag_idx + 1]
             xmax_selected = xmax[tag_idx : tag_idx + 1]
             print(f'Training using tag {tag}')
-            m_name = f'{model_name}_{tag}'
-        else:
+        elif args.evalmethod == 'not-selected':
             tags_selected = tags_.copy()
             tags_selected.remove(tag)
             xmin_selected = np.hstack([xmin[: tag_idx], xmin[tag_idx + 1 :]])
             xmax_selected = np.hstack([xmax[: tag_idx], xmax[tag_idx + 1 :]])
             print(f'Training using all but tag {tag}')
-            m_name = f'{model_name}_not-{tag}'
+        elif args.evalmethod == 'permuted':
+            tags_selected = tags_.copy()
+            xmin_selected = xmin
+            xmax_selected = xmax
+            print(f'Training using permuted tag {tag}')
 
         nfeatures = len(xmin_selected)
         assert len(xmin_selected) == nfeatures
@@ -200,6 +204,7 @@ if __name__ == '__main__':
 
         # create model and results directories
 
+        m_name = f'{model_name}_{args.evalmethod}_{tag}'
         m_path = osp.join(task_models_dir, m_name)
         if not osp.isdir(m_path):
             os.mkdir(m_path)
@@ -246,7 +251,7 @@ if __name__ == '__main__':
 
         # save the results
 
-        print(f'Error: {error}')
+        print(f'Prediction error: {error}')
         idx = np.where(p['Tags'].values == tag)[0]
-        p[model_name].values[idx] = error
+        p[args.evalmethod].values[idx] = error
         p.to_csv(r_path, index=None)

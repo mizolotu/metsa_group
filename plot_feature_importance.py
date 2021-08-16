@@ -6,7 +6,7 @@ import argparse as arp
 
 from scipy.stats import spearmanr
 from config import *
-from calculate_error_by_tag import set_seeds, load_meta
+from calculate_prediction_error import set_seeds, load_meta
 from matplotlib import pyplot as pp
 from matplotlib.lines import Line2D
 
@@ -55,18 +55,6 @@ if __name__ == '__main__':
         tag_list.extend(tags[key])
     tags = np.array(tag_list)
     dcs = np.array(dc_list, dtype=int)
-
-    # load data
-
-    vals = []
-    for stage in stages:
-        fpath = osp.join(processed_data_dir, f'{args.task}_{stage}{csv}')
-        p = pd.read_csv(fpath)
-        vals.append(p.values)
-    vals = np.vstack(vals)
-    X = vals[:, :-1]
-    y = vals[:, -1]
-    nfeatures = X.shape[1]
 
     # plot settings
 

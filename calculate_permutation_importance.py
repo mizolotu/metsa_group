@@ -6,7 +6,7 @@ import numpy as np
 import argparse as arp
 
 from config import *
-from calculate_error_by_tag import set_seeds, load_meta, load_batches, regression_mapper, mlp
+from calculate_prediction_error import set_seeds, load_meta, load_batches, regression_mapper, mlp
 
 def cnn(nfeatures, nhiddens, xmin, xmax, ymin, ymax, latent_dim=64, nfilters=512, kernel_size=3, batchnorm=True, dropout=0.5, lr=2.5e-4):
     nfeatures_sum = np.sum(nfeatures)

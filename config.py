@@ -7,9 +7,9 @@ models_dir = 'models'
 results_dir = 'results'
 figures_dir = 'figures'
 tags_fname = 'tags.xlsx'
-error_by_tag_csv = 'error_by_tag.csv'
-error_by_not_tag_csv = 'error_by_not_tag.csv'
-error_by_tag_permutation_csv = 'error_by_tag_permutation.csv'
+correlation_csv = 'correlation.csv'
+prediction_error_csv = 'prediction_error.csv'
+permutation_error_csv = 'permutation_error.csv'
 
 # data
 
@@ -28,7 +28,7 @@ nan_value = -1
 
 seed = 0
 batch_size = 512
-epochs = 10000
+epochs = 10
 patience = 100
 
 # other
