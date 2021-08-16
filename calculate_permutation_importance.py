@@ -114,7 +114,7 @@ if __name__ == '__main__':
         model.fit(
             batches['train'],
             validation_data=batches['validate'],
-            epochs=10,
+            epochs=epochs,
             verbose=args.verbose,
             callbacks=[tf.keras.callbacks.EarlyStopping(
                 monitor='val_loss',
