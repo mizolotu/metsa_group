@@ -120,10 +120,6 @@ if __name__ == '__main__':
     ymin = meta['ymin']
     ymax = meta['ymax']
 
-    # load data
-
-
-
     # create output directories
 
     task_models_dir = osp.join(models_dir, args.task)
