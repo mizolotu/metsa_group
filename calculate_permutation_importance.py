@@ -46,6 +46,7 @@ def cnn(nfeatures, nhiddens, xmin, xmax, ymin, ymax, latent_dim=64, nfilters=512
         hidden.append(tf.keras.layers.Dense(latent_dim, activation='relu')(spl))
     hidden = tf.stack(hidden, axis=1)
     hidden = tf.keras.layers.Conv1D(nfilters, kernel_size, activation='relu')(hidden)
+    hidden = tf.keras.layers.Conv1D(nfilters, kernel_size, activation='relu')(hidden)
     hidden = tf.keras.layers.Flatten()(hidden)
     for nh in nhiddens:
         hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
