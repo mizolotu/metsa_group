@@ -9,22 +9,24 @@ from config import *
 from calculate_prediction_error import set_seeds, load_meta
 from matplotlib import pyplot as pp
 from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 
-def plot_bars(tags, heights, colors, items_for_argsort, fname, reverse=False):
+def plot_bars(tags, heights, hatches, items_for_argsort, fname, reverse=False):
     fpath = osp.join(task_figures_dir, f'{fname}{pdf}')
     idx = np.argsort(items_for_argsort)
     if reverse:
         idx = idx[::-1]
     items = tags[idx]
-    h = heights[idx]
-    c = colors[idx]
-    pp.bar(items, height=h, color=c)
-    pp.xlabel('Tag name', fontdict={'size': 4})
-    pp.ylabel('Feature importance', fontdict={'size': 4})
-    pp.xticks(fontsize=2, rotation='vertical')
-    pp.yticks(fontsize=4)
-    pp.legend(legend_items, legend_names, prop={'size': 4})
-    pp.savefig(fpath)
+    he = heights[idx]
+    ha = hatches[idx]
+    pp.figure(figsize=(21.2, 12))
+    pp.bar(items, height=he, color='white', edgecolor='black', hatch=ha)
+    pp.xlabel('Tag name', fontdict={'size': 12})
+    pp.ylabel('Feature importance', fontdict={'size': 12})
+    pp.xticks(fontsize=8, rotation='vertical')
+    pp.yticks(fontsize=12)
+    pp.legend(legend_items, legend_names, prop={'size': 12})
+    pp.savefig(fpath, bbox_inches='tight')
     pp.close()
 
 if __name__ == '__main__':
@@ -59,43 +61,44 @@ if __name__ == '__main__':
     # plot settings
 
     unique_colors = np.array(['darkviolet', 'royalblue', 'seagreen', 'gold', 'firebrick'])
-    legend_items = [Line2D([0], [0], color=color) for color in unique_colors]
+    unique_hatches = np.array(['-', '\\', '/', '.', 'o'])
+    #legend_items = [Line2D([0], [0], color=color) for color in unique_colors]
+    legend_items = [Patch(facecolor='white', edgecolor='black', hatch=hatch) for hatch in unique_hatches]
     legend_names = [f'Delay class {dc}' for dc in np.unique(dcs)]
-    color_idx = dcs - 1
-    colors = unique_colors[color_idx]
+    _idx = dcs - 1
+    colors = unique_colors[_idx]
+    hatches = unique_hatches[_idx]
 
-    # pearson correlation
+    # data
 
-    pearson_corr = np.zeros(nfeatures)
-    for i in range(nfeatures):
-        pearson_corr[i] = np.corrcoef(X[:, i], y)[0, 1]
-    pearson_corr_abs = np.abs(pearson_corr)
-
-    # spearman correlation
-
-    s_ranks, _ = spearmanr(X, y)
-    spearman_corr = s_ranks[:-1, -1]
-    spearman_corr_abs = np.abs(spearman_corr)
-
-    # error by tag
-
-    fpath = osp.join(results_dir, args.task, error_by_tag_csv)
-    p = pd.read_csv(fpath)
-    assert np.all(tags == p['Tags'].values), 'Wrong tag order, something is worng :('
-    errors = p.values[:, 1:]
-    non_nan_idx = np.all(pd.isna(errors)==False, axis=0)
-    idx = np.where(non_nan_idx==True)[0][-1]
-    errors_by_tag = errors[:, idx]
+    data = []
+    data_to_sort = []
+    reverses = []
+    names = []
+    for fname in [correlation_csv, prediction_error_csv, permutation_error_csv]:
+        fpath = osp.join(results_dir, args.task, fname)
+        p = pd.read_csv(fpath)
+        assert np.all(tags == p['Tags'].values), 'Wrong tag order, something is worng :('
+        for col in range(len(p.keys()) - 1):
+            errors = p.values[:, 1 + col]
+            data.append(errors)
+            if fname == correlation_csv:
+                data_to_sort.append(np.abs(errors))
+            else:
+                data_to_sort.append(errors)
+            if fpath == prediction_error_csv and col == 0:
+                reverses.append(False)
+            else:
+                reverses.append(True)
+            key = p.keys()[col + 1]
+            prefix = fname.split(csv)[0]
+            names.append(f'{prefix}_{key}')
 
     # plot results
 
-    items_list = [pearson_corr, spearman_corr, errors_by_tag]
-    items_as_list = [pearson_corr_abs, spearman_corr_abs, errors_by_tag]
-    fnames = ['pearson_by_tag', 'spearman_by_tag', 'error_by_tag']
-    reverses = [True, True, False]
-    for items, items_as, fname, reverse in zip(items_list, items_as_list, fnames, reverses):
-        print(fname)
-        plot_bars(tags, items, colors, items_as, fname, reverse)
+    for items, items_as, name, reverse in zip(data, data_to_sort, names, reverses):
+        plot_bars(tags, items, hatches, items_as, name, reverse)
+
 
 
 

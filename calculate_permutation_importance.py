@@ -6,7 +6,31 @@ import numpy as np
 import argparse as arp
 
 from config import *
-from calculate_prediction_error import set_seeds, load_meta, load_batches, regression_mapper, mlp
+from calculate_prediction_error import set_seeds, load_meta, load_batches, regression_mapper
+
+def mlp(nfeatures, nhiddens, xmin, xmax, ymin, ymax, latent_dim=64, batchnorm=True, dropout=0.5, lr=2.5e-4):
+    nfeatures_sum = np.sum(nfeatures)
+    inputs = tf.keras.layers.Input(shape=(nfeatures_sum,))
+    inputs_std = (inputs - xmin) / (xmax - xmin + eps)
+    if batchnorm:
+        hidden = tf.keras.layers.BatchNormalization()(inputs_std)
+    else:
+        hidden = inputs_std
+    hidden_spl = tf.split(hidden, nfeatures, axis=1)
+    hidden = []
+    for spl in hidden_spl:
+        hidden.append(tf.keras.layers.Dense(latent_dim, activation='relu')(spl))
+    hidden = tf.stack(hidden, axis=1)
+    hidden = tf.keras.layers.Flatten()(hidden)
+    for nh in nhiddens:
+        hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
+        if dropout is not None:
+            hidden = tf.keras.layers.Dropout(dropout)(hidden)
+    outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
+    outputs = outputs * (ymax - ymin) + ymin
+    model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
+    model.compile(loss=tf.keras.losses.MeanAbsoluteError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
+    return model
 
 def cnn(nfeatures, nhiddens, xmin, xmax, ymin, ymax, latent_dim=64, nfilters=512, kernel_size=3, batchnorm=True, dropout=0.5, lr=2.5e-4):
     nfeatures_sum = np.sum(nfeatures)
