@@ -4,14 +4,12 @@ import pandas as pd
 import numpy as np
 import argparse as arp
 
-from scipy.stats import spearmanr
 from config import *
-from calculate_prediction_error import set_seeds, load_meta
+from calculate_prediction_error import load_meta
 from matplotlib import pyplot as pp
-from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-def plot_bars(tags, heights, hatches, items_for_argsort, fname, figh, reverse=False):
+def plot_bars(tags, heights, hatches, items_for_argsort, fname, figh, ylabel, reverse=False):
     fpath = osp.join(task_figures_dir, f'{fname}{pdf}')
     idx = np.argsort(items_for_argsort)
     if reverse:
@@ -22,7 +20,7 @@ def plot_bars(tags, heights, hatches, items_for_argsort, fname, figh, reverse=Fa
     pp.figure(figsize=(21.2, figh))
     pp.bar(items, height=he, color='white', edgecolor='black', hatch=ha)
     pp.xlabel('Tag name', fontdict={'size': 12})
-    pp.ylabel('Feature importance', fontdict={'size': 12})
+    pp.ylabel(ylabel, fontdict={'size': 12})
     pp.xticks(fontsize=8, rotation='vertical')
     pp.yticks(fontsize=12)
     pp.legend(legend_items, legend_names, prop={'size': 12})
@@ -76,6 +74,7 @@ if __name__ == '__main__':
     reverses = []
     names = []
     fighs = []
+    ylabels = []
     for fname in [correlation_csv, prediction_error_csv, permutation_error_csv]:
         fpath = osp.join(results_dir, args.task, fname)
         p = pd.read_csv(fpath)
@@ -86,9 +85,14 @@ if __name__ == '__main__':
             if fname == correlation_csv:
                 data_to_sort.append(np.abs(errors))
                 fighs.append(12)
+                ylabels.append('Correlation')
             else:
                 data_to_sort.append(errors)
                 fighs.append(8)
+                if fname == permutation_error_csv:
+                    ylabels.append('Permutation feature importance')
+                elif fname == prediction_error_csv:
+                    ylabels.append('Prediction error')
             if fpath == prediction_error_csv and col == 0:
                 reverses.append(False)
             else:
@@ -99,8 +103,8 @@ if __name__ == '__main__':
 
     # plot results
 
-    for items, items_as, name, figh, reverse in zip(data, data_to_sort, names, fighs, reverses):
-        plot_bars(tags, items, hatches, items_as, name, figh, reverse)
+    for items, items_as, name, figh, ylabel, reverse in zip(data, data_to_sort, names, fighs, ylabels, reverses):
+        plot_bars(tags, items, hatches, items_as, name, figh, ylabel, reverse)
 
 
 

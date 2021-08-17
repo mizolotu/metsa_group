@@ -32,6 +32,8 @@ def load_samples(fname):
         keys = p.keys().tolist()[1:]
         keys = [key.replace('_', '.') for key in keys]
         values = p.values[:, 1:]
+        print(keys.index('125A0321-WI'))
+        print(values.shape, np.max(values[:, keys.index('125A0321-WI')]))
         timestamps = np.array([time.mktime(dparser.parse(item).timetuple()) for item in p.values[:, 0]])
     else:
         keys, values, timestamps = None, None, None
@@ -43,7 +45,7 @@ def select_keys(keys, values, tags):
     assert br_key in keys
     br_index = keys.index(br_key)
     cols = [col for col, key in enumerate(keys) if key in tags and key != br_key]
-    return [keys[i] for i in cols], values[:, cols], values[:, br_index:br_index+1]
+    return [keys[i] for i in cols], values[:, cols], values[:, br_index]
 
 def powerset(items):
     return chain.from_iterable(combinations(items, r) for r in range(1, len(items)+1))
@@ -65,10 +67,10 @@ def select_values(values, labels, timestamps, tstart=None, label_thr=80.0):
     values = values[idx, :]
     timestamps = timestamps[idx]
     if tstart is None:
-        idx = np.where((pd.isna(labels[:, 0]) == False) & (labels[:, 0] > label_thr))[0]
+        idx = np.where((pd.isna(labels) == False) & (labels > label_thr))[0]
     else:
         idx = np.where(timestamps > tstart)[0]
-    return values[idx, :], labels[idx, :], timestamps[idx]
+    return values[idx, :], labels[idx], timestamps[idx]
 
 if __name__ == '__main__':
 
@@ -83,7 +85,11 @@ if __name__ == '__main__':
 
     tags = load_tags(tags_fname)
     keys, values, timestamps = load_samples(args.samples)
+    print(np.max(values[:, keys.index('125A0321-WI')]))
+    assert len(keys) == values.shape[1]
     keys, values, labels = select_keys(keys, values, tags)
+    assert len(keys) == values.shape[1]
+    print('125A0321-WI' in keys)
     values, labels, timestamps = select_values(values, labels, timestamps)
 
     # set seed for results reproduction
@@ -148,7 +154,7 @@ if __name__ == '__main__':
     for fi, stage in enumerate(stages):
         fname = f'{args.task}_{stage}{csv}'
         fpath = osp.join(processed_data_dir, fname)
-        data = np.hstack([vals[inds_splitted[fi], :], labels[inds_splitted[fi]]])
+        data = np.hstack([vals[inds_splitted[fi], :], labels[inds_splitted[fi], None]])
         pd.DataFrame(data, columns=tag_names).to_csv(fpath, mode='w', index=False)
 
     # save meta
