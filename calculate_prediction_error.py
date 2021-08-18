@@ -54,6 +54,32 @@ def mlp(nfeatures, nhiddens, xmin, xmax, ymin, ymax, dropout=0.5, batchnorm=True
     model.compile(loss=tf.keras.losses.MeanAbsoluteError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
     return model
 
+def cnn(nfeatures, nhiddens, xmin, xmax, ymin, ymax, latent_dim=64, nfilters=512, kernel_size=3, batchnorm=True, dropout=0.5, lr=2.5e-4):
+    nfeatures_sum = np.sum(nfeatures)
+    inputs = tf.keras.layers.Input(shape=(nfeatures_sum,))
+    inputs_std = (inputs - xmin) / (xmax - xmin + eps)
+    if batchnorm:
+        hidden = tf.keras.layers.BatchNormalization()(inputs_std)
+    else:
+        hidden = inputs_std
+    hidden_spl = tf.split(hidden, nfeatures, axis=1)
+    hidden = []
+    for spl in hidden_spl:
+        hidden.append(tf.keras.layers.Dense(latent_dim, activation='relu')(spl))
+    hidden = tf.stack(hidden, axis=1)
+    hidden = tf.keras.layers.Conv1D(nfilters, kernel_size, activation='relu')(hidden)
+    hidden = tf.keras.layers.Conv1D(nfilters, kernel_size, activation='relu')(hidden)
+    hidden = tf.keras.layers.Flatten()(hidden)
+    for nh in nhiddens:
+        hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
+        if dropout is not None:
+            hidden = tf.keras.layers.Dropout(dropout)(hidden)
+    outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
+    outputs = outputs * (ymax - ymin) + ymin
+    model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
+    model.compile(loss=tf.keras.losses.MeanAbsoluteError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
+    return model
+
 def identity_block(x, nhidden):
     h = tf.keras.layers.Dense(nhidden)(x)
     h = tf.keras.layers.BatchNormalization()(h)
@@ -90,12 +116,12 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train classifiers')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-m', '--model', help='Model', default='mlp')
+    parser.add_argument('-m', '--model', help='Model', default='cnn')
     parser.add_argument('-l', '--layers', help='Number of neurons in layers', default=[512, 512], type=int, nargs='+')
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
     parser.add_argument('-v', '--verbose', help='Verbose', default=False, type=bool)
-    parser.add_argument('-e', '--evalmethod', help='Evaluation method', choices=['selected', 'not-selected', 'permuted'], default='selected')
+    parser.add_argument('-e', '--evalmethod', help='Evaluation method', choices=['selected', 'not-selected', 'permuted'], default='not-selected')
     args = parser.parse_args()
 
     # cuda
@@ -164,20 +190,27 @@ if __name__ == '__main__':
             xmin_selected = xmin[tag_idx : tag_idx + 1]
             xmax_selected = xmax[tag_idx : tag_idx + 1]
             print(f'{tagi + 1}/{len(tags_)} Training using tag {tag}')
+            nfeatures = 1
         elif args.evalmethod == 'not-selected':
+            nfeatures = []
+            for key in tag_keys:
+                if tag in tags[key]:
+                    nfeatures.append(len(tags[key]) - 1)
+                else:
+                    nfeatures.append(len(tags[key]))
             tags_selected = tags_.copy()
             tags_selected.remove(tag)
             xmin_selected = np.hstack([xmin[: tag_idx], xmin[tag_idx + 1 :]])
             xmax_selected = np.hstack([xmax[: tag_idx], xmax[tag_idx + 1 :]])
             print(f'{tagi + 1}/{len(tags_)} Training using all but tag {tag}')
         elif args.evalmethod == 'permuted':
+            nfeatures = []
+            for key in tag_keys:
+                nfeatures.append(len(tags[key]))
             tags_selected = tags_.copy()
             xmin_selected = xmin
             xmax_selected = xmax
             print(f'{tagi + 1}/{len(tags_)} Training using permuted tag {tag}')
-
-        nfeatures = len(xmin_selected)
-        assert len(xmin_selected) == nfeatures
 
         # fpath
 

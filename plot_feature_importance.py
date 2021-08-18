@@ -16,6 +16,7 @@ def plot_bars(tags, heights, hatches, items_for_argsort, fname, figh, ylabel, re
         idx = idx[::-1]
     items = tags[idx]
     he = heights[idx]
+    print(fname, items[0], he[0])
     ha = hatches[idx]
     pp.figure(figsize=(21.2, figh))
     pp.bar(items, height=he, color='white', edgecolor='black', hatch=ha)
@@ -88,12 +89,13 @@ if __name__ == '__main__':
                 ylabels.append('Correlation')
             else:
                 data_to_sort.append(errors)
-                fighs.append(7)
                 if fname == permutation_error_csv:
                     ylabels.append('Permutation feature importance')
+                    fighs.append(7)
                 elif fname == prediction_error_csv:
                     ylabels.append('Prediction error')
-            if fpath == prediction_error_csv and col == 0:
+                    fighs.append(12)
+            if fname == prediction_error_csv and col == 0:
                 reverses.append(False)
             else:
                 reverses.append(True)

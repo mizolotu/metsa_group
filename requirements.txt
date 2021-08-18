@@ -6,3 +6,4 @@ tensorflow
 openpyxl
 python-dateutil
 matplotlib
+seaborn

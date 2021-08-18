@@ -14,7 +14,7 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Plot feature importance')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-f', '--feature', help='Feature to plot', default='126A0118-QI')
+    parser.add_argument('-f', '--feature', help='Feature to plot', default='126A0519-QI') # '126A0118-QI' '126A0333-QI' '126A0519-QI' '126A0535-QIC'
     args = parser.parse_args()
 
     # meta
@@ -32,7 +32,6 @@ if __name__ == '__main__':
     # delay classes and tags
 
     tags_ = []
-    xmin, xmax = [], []
     for key in sorted(tags.keys()):
         tags_.extend(tags[key])
 
@@ -56,11 +55,11 @@ if __name__ == '__main__':
     idx_ = np.where((X[:, idx] != meta['xmax'][idx]) & (X[:, idx] != meta['xmin'][idx]))
     fpath = osp.join(task_figures_dir, f'{args.feature}_vs_{br_key}.pdf')
     pp.figure(figsize=(12, 12))
-    pp.plot(x[idx_], y[idx_], '.')
+    pp.plot(x[idx_], y[idx_], 'k.')
     pp.xlabel(args.feature, fontdict={'size': 12})
     pp.ylabel(br_key, fontdict={'size': 12})
     pp.legend(loc='best', prop={'size': 12})
     pp.xticks(fontsize=12)
     pp.yticks(fontsize=12)
-    pp.savefig(fpath)
+    pp.savefig(fpath, bbox_inches='tight')
     pp.close()
