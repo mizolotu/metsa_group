@@ -20,7 +20,7 @@ def plot_bars(tags, heights, hatches, items_for_argsort, fname, figh, ylabel, re
     ha = hatches[idx]
     pp.figure(figsize=(21.2, figh))
     pp.bar(items, height=he, color='white', edgecolor='black', hatch=ha)
-    pp.xlabel('Tag name', fontdict={'size': 12})
+    pp.xlabel('Features', fontdict={'size': 12})
     pp.ylabel(ylabel, fontdict={'size': 12})
     pp.xticks(fontsize=8, rotation='vertical')
     pp.yticks(fontsize=12)
@@ -61,7 +61,6 @@ if __name__ == '__main__':
 
     unique_colors = np.array(['darkviolet', 'royalblue', 'seagreen', 'gold', 'firebrick'])
     unique_hatches = np.array(['-', '\\', '/', '.', 'o'])
-    #legend_items = [Line2D([0], [0], color=color) for color in unique_colors]
     legend_items = [Patch(facecolor='white', edgecolor='black', hatch=hatch) for hatch in unique_hatches]
     legend_names = [f'Delay class {dc}' for dc in np.unique(dcs)]
     _idx = dcs - 1
@@ -94,7 +93,7 @@ if __name__ == '__main__':
                     fighs.append(7)
                 elif fname == prediction_error_csv:
                     ylabels.append('Prediction error')
-                    fighs.append(12)
+                    fighs.append(7)
             if fname == prediction_error_csv and col == 0:
                 reverses.append(False)
             else:

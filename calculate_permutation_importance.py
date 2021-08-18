@@ -98,12 +98,12 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train classifiers')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-m', '--model', help='Model', default='att')
-    parser.add_argument('-l', '--layers', help='Number of neurons in layers', default=[512, 512], type=int, nargs='+')
+    parser.add_argument('-m', '--model', help='Model', default='mlp')
+    parser.add_argument('-l', '--layers', help='Number of neurons in layers', default=[2048, 2048], type=int, nargs='+')
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
     parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
-    parser.add_argument('-p', '--npermutations', help='Number of permutations', type=int, default=10)
+    parser.add_argument('-p', '--npermutations', help='Number of permutations', type=int, default=100)
     args = parser.parse_args()
 
     # cuda
@@ -263,7 +263,7 @@ if __name__ == '__main__':
             predictions = model.predict(Xp)[:, 0]
             error[i] = np.mean(np.abs(Y - predictions))
 
-        feature_importance = np.mean(error) - error_full
+        feature_importance = np.mean(error) # - error_full
 
         # save the results
 

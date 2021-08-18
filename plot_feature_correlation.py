@@ -56,22 +56,14 @@ if __name__ == '__main__':
             r[i, j] = np.corrcoef(X[:, i], X[:, j])[0, 1]
             s[i, j], _ = spearmanr(X[:, i], X[:, j])
 
-    # ranking based on correlation
+    # max correlations
 
-    r_r = np.zeros(nfeatures)
-    r_s = np.zeros(nfeatures)
     for i in range(nfeatures):
         a = np.abs(r[i, :])
         b = np.abs(s[i, :])
         idxa = np.argsort(a)
         idxb = np.argsort(b)
-        r_r[idxa[-2]] += 1
-        r_s[idxb[-2]] += 1
-        print(i, tags_[i], np.mean(a), tags_[idxa[-2]], r[i, idxa[-2]], np.mean(b), tags_[idxb[-2]], s[i, idxb[-2]])
-    idxr = np.argsort(r_r)
-    idxs = np.argsort(r_s)
-    for i, j in zip(idxr, idxs):
-        print(tags_[i], r_r[i], tags_[j], r_s[j])
+        print(i, tags_[i], tags_[idxa[-2]], r[i, idxa[-2]], tags_[idxb[-2]], s[i, idxb[-2]])
 
     # data frames and colormap
 
