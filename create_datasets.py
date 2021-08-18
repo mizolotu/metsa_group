@@ -32,8 +32,6 @@ def load_samples(fname):
         keys = p.keys().tolist()[1:]
         keys = [key.replace('_', '.') for key in keys]
         values = p.values[:, 1:]
-        print(keys.index('125A0321-WI'))
-        print(values.shape, np.max(values[:, keys.index('125A0321-WI')]))
         timestamps = np.array([time.mktime(dparser.parse(item).timetuple()) for item in p.values[:, 0]])
     else:
         keys, values, timestamps = None, None, None
@@ -65,6 +63,7 @@ def sort_by_delay_class(keys, values, tags):
 def select_values(values, labels, timestamps, tstart=None, label_thr=80.0):
     idx = np.argsort(timestamps)
     values = values[idx, :]
+    labels = labels[idx]
     timestamps = timestamps[idx]
     if tstart is None:
         idx = np.where((pd.isna(labels) == False) & (labels > label_thr))[0]
@@ -85,11 +84,9 @@ if __name__ == '__main__':
 
     tags = load_tags(tags_fname)
     keys, values, timestamps = load_samples(args.samples)
-    print(np.max(values[:, keys.index('125A0321-WI')]))
     assert len(keys) == values.shape[1]
     keys, values, labels = select_keys(keys, values, tags)
     assert len(keys) == values.shape[1]
-    print('125A0321-WI' in keys)
     values, labels, timestamps = select_values(values, labels, timestamps)
 
     # set seed for results reproduction
