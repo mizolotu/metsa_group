@@ -33,6 +33,8 @@ if __name__ == '__main__':
     tags_ = []
     for key in sorted(tags.keys()):
         tags_.extend(tags[key])
+    xmin = np.array(meta['xmin'])
+    xmax = np.array(meta['xmax'])
 
     # load data
 
@@ -43,6 +45,7 @@ if __name__ == '__main__':
         vals.append(p.values)
     vals = np.vstack(vals)
     X = vals[:, :-1]
+    X = (X - xmin[None, :]) / (xmax[None, :] - xmin[None, :])
     y = vals[:, -1]
     nfeatures = X.shape[1]
 

@@ -14,7 +14,7 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Plot feature importance')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-f', '--feature', help='Feature to plot', default='125A0321-WI')
+    parser.add_argument('-f', '--feature', help='Feature to plot', default='126A0118-QI')
     args = parser.parse_args()
 
     # meta
@@ -32,6 +32,7 @@ if __name__ == '__main__':
     # delay classes and tags
 
     tags_ = []
+    xmin, xmax = [], []
     for key in sorted(tags.keys()):
         tags_.extend(tags[key])
 
@@ -51,14 +52,15 @@ if __name__ == '__main__':
 
     assert args.feature in tags_
     idx = tags_.index(args.feature)
-    print(np.min(X[:, idx]), np.max(X[:, idx]))
+    x = X[:, idx]
+    idx_ = np.where((X[:, idx] != meta['xmax'][idx]) & (X[:, idx] != meta['xmin'][idx]))
     fpath = osp.join(task_figures_dir, f'{args.feature}_vs_{br_key}.pdf')
-    pp.figure(figsize=(6, 6))
-    pp.plot(X[:, idx], y, '.')
-    pp.xlabel(args.feature, fontdict={'size': 4})
-    pp.ylabel(br_key, fontdict={'size': 4})
-    pp.legend(loc='best', prop={'size': 4})
-    pp.xticks(fontsize=4)
-    pp.yticks(fontsize=4)
+    pp.figure(figsize=(12, 12))
+    pp.plot(x[idx_], y[idx_], '.')
+    pp.xlabel(args.feature, fontdict={'size': 12})
+    pp.ylabel(br_key, fontdict={'size': 12})
+    pp.legend(loc='best', prop={'size': 12})
+    pp.xticks(fontsize=12)
+    pp.yticks(fontsize=12)
     pp.savefig(fpath)
     pp.close()

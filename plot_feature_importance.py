@@ -88,7 +88,7 @@ if __name__ == '__main__':
                 ylabels.append('Correlation')
             else:
                 data_to_sort.append(errors)
-                fighs.append(8)
+                fighs.append(7)
                 if fname == permutation_error_csv:
                     ylabels.append('Permutation feature importance')
                 elif fname == prediction_error_csv:

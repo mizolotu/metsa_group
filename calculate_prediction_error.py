@@ -153,7 +153,7 @@ if __name__ == '__main__':
 
     # loop through tags
 
-    for tag in tags_:
+    for tagi, tag in enumerate(tags_):
 
         # features
 
@@ -163,18 +163,18 @@ if __name__ == '__main__':
             tags_selected = [tag]
             xmin_selected = xmin[tag_idx : tag_idx + 1]
             xmax_selected = xmax[tag_idx : tag_idx + 1]
-            print(f'Training using tag {tag}')
+            print(f'{tagi + 1}/{len(tags_)} Training using tag {tag}')
         elif args.evalmethod == 'not-selected':
             tags_selected = tags_.copy()
             tags_selected.remove(tag)
             xmin_selected = np.hstack([xmin[: tag_idx], xmin[tag_idx + 1 :]])
             xmax_selected = np.hstack([xmax[: tag_idx], xmax[tag_idx + 1 :]])
-            print(f'Training using all but tag {tag}')
+            print(f'{tagi + 1}/{len(tags_)} Training using all but tag {tag}')
         elif args.evalmethod == 'permuted':
             tags_selected = tags_.copy()
             xmin_selected = xmin
             xmax_selected = xmax
-            print(f'Training using permuted tag {tag}')
+            print(f'{tagi + 1}/{len(tags_)} Training using permuted tag {tag}')
 
         nfeatures = len(xmin_selected)
         assert len(xmin_selected) == nfeatures
