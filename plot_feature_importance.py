@@ -120,7 +120,6 @@ if __name__ == '__main__':
 
     # rank features
 
-    print(S.shape)
     S = S / np.sum(S, 1)[:, None]
     S = np.sum(S, 0)
     plot_bars(tags, S, hatches, S, 'features_ranked', 7, 'Feature importance score', reverse=True, plot_png=True)
