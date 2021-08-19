@@ -120,8 +120,8 @@ if __name__ == '__main__':
     parser.add_argument('-l', '--layers', help='Number of neurons in layers', default=[512, 512], type=int, nargs='+')
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
-    parser.add_argument('-v', '--verbose', help='Verbose', default=False, type=bool)
-    parser.add_argument('-e', '--evalmethod', help='Evaluation method', choices=['selected', 'not-selected', 'permuted'], default='not-selected')
+    parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
+    parser.add_argument('-e', '--evalmethod', help='Evaluation method', choices=['selected', 'not-selected', 'permuted'], default='permuted')
     args = parser.parse_args()
 
     # cuda
@@ -225,6 +225,32 @@ if __name__ == '__main__':
         for stage in stages:
             batches[stage] = load_batches(fpaths[stage], tags_and_label, batch_size).map(mapper)
 
+        # load training and validation data
+
+        X_train, Y_train, X_val, Y_val = [], [], [], []
+        for x, y in batches['train']:
+            X_train.append(x)
+            Y_train.append(y)
+        X_train = np.vstack(X_train)
+        Y_train = np.hstack(Y_train)
+        for x, y in batches['train']:
+            X_val.append(x)
+            Y_val.append(y)
+        X_val = np.vstack(X_val)
+        Y_val = np.hstack(Y_val)
+
+        # permute training and validation data
+
+        ntrain = X_train.shape[0]
+        nval = X_val.shape[0]
+        if args.evalmethod == 'permuted':
+            shuffle_idx_tr = np.arange(ntrain)
+            shuffle_idx_val = np.arange(nval)
+            np.random.shuffle(shuffle_idx_tr)
+            np.random.shuffle(shuffle_idx_val)
+            X_train[:, tag_idx] = X_train[shuffle_idx_tr, tag_idx]
+            X_val[:, tag_idx] = X_val[shuffle_idx_val, tag_idx]
+
         # create model
 
         model = model_type(nfeatures, args.layers, xmin_selected, xmax_selected, ymin, ymax)
@@ -249,8 +275,11 @@ if __name__ == '__main__':
             # train model
 
             model.fit(
-                batches['train'],
-                validation_data=batches['validate'],
+                #batches['train'],
+                X_train, Y_train,
+                batch_size=batch_size,
+                #validation_data=batches['validate'],
+                validation_data=(X_val, Y_val),
                 epochs=epochs,
                 verbose=args.verbose,
                 callbacks=[tf.keras.callbacks.EarlyStopping(
