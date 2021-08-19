@@ -45,7 +45,7 @@ python3 calculate_prediction_error.py -e <evaluation method: selected, not-selec
 ```bash
 python3 plot_feature_importance.py
 ```
-<img src="figures/predict_bleach_ratio/features_ranked.pdf" width="800"/>
+<img src="figures/predict_bleach_ratio/features_ranked.png" width="800"/>
 
 6. One can also plot a particular feature values against the target variable:
 
