@@ -14,7 +14,7 @@ if __name__ == '__main__':
 
     # args
 
-    parser = arp.ArgumentParser(description='Plot feature importance')
+    parser = arp.ArgumentParser(description='Plot feature correlation')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     args = parser.parse_args()
 
