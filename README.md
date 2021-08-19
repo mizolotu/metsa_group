@@ -10,8 +10,9 @@
 ### Installation
 
 1. Clone this repository
-2. Export bleach ratio data from Azure in csv format, name it for example "some_samples.csv", and put it into directory ```data/raw```
-3. pip3 install -r requirements
+2. Create directory ```raw``` in directory ```data```
+3. Export bleach ratio data from Azure in csv format, name it for example "some_samples.csv", and put it into ```data/raw```
+4. pip3 install -r requirements
 
 ### How to use
 
@@ -21,19 +22,32 @@
 python3 create_datasets.py -s <csv file with samples, e.g. some_samples.csv>
 ```
 
-2. Train a model
+2. Calculate feature correlation with the target variable:
 
 ```bash
-python3 train_models_to_predict_bleach_ratio.py
+python3 calculate_target_correlation.py
 ```
 
-3. Test the model (TO DO)
+3. Calculate permutation feature importance:
 
 ```bash
-python3 test_models_to_predict_bleach_ratio.py -s <csv file with samples, e.g. more_samples.csv>
+python3 calculate_permutation_importance.py -m <prediction model, e.g. cnn> -l <model layer sizes, e.g. 2048 2048>
 ```
 
-### Results
+4. Calculate feature importance based on prediction error:
 
-1. Prediction errors for different delay classes and different models can be found [here](results/predict_bleach_ratio/error.csv)
-2. Figures with train and validation errors during the training stage (TO DO)
+```bash
+python3 calculate_prediction_error.py -e <evaluation method: selected, not-selected or permuted> -m <prediction model, e.g. cnn> -l <model layer sizes, e.g. 2048 2048>
+```
+
+5. Plot feature importance:
+
+```bash
+python3 plot_feature_importance.py
+```
+
+6. One can also plot a particular feature values against the target variable:
+
+```bash
+python3 plot_feature_values.py -f <feature name, e.g. 126A0333-QI>
+```
