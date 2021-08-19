@@ -16,7 +16,7 @@ def plot_bars(tags, heights, hatches, items_for_argsort, fname, figh, ylabel, re
         idx = idx[::-1]
     items = tags[idx]
     he = heights[idx]
-    print(fname, items[0], he[0])
+    print(fname, items[0], he[0], items[1], he[1], items[2], he[2])
     ha = hatches[idx]
     pp.figure(figsize=(21.2, figh))
     pp.bar(items, height=he, color='white', edgecolor='black', hatch=ha)
@@ -104,8 +104,22 @@ if __name__ == '__main__':
 
     # plot results
 
+    S = []
     for items, items_as, name, figh, ylabel, reverse in zip(data, data_to_sort, names, fighs, ylabels, reverses):
         plot_bars(tags, items, hatches, items_as, name, figh, ylabel, reverse)
+        if np.all(pd.isna(items) == False):
+            if reverse:
+                s = items_as
+            else:
+                s = 1 / items_as
+            S.append(s)
+    S = np.vstack(S)
+
+    # rank features
+
+    S = S / np.sum(S, 1)[:, None]
+    S = np.sum(S, 0)
+    plot_bars(tags, S, hatches, S, 'features_ranked', 7, 'Feature importance score', True)
 
 
 
