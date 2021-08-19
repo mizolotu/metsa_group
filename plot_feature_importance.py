@@ -9,7 +9,7 @@ from calculate_prediction_error import load_meta
 from matplotlib import pyplot as pp
 from matplotlib.patches import Patch
 
-def plot_bars(tags, heights, hatches, items_for_argsort, fname, figh, ylabel, reverse=False):
+def plot_bars(tags, heights, hatches, items_for_argsort, fname, figh, ylabel, reverse=False, plot_png=False):
     fpath = osp.join(task_figures_dir, f'{fname}{pdf}')
     idx = np.argsort(items_for_argsort)
     if reverse:
@@ -26,6 +26,9 @@ def plot_bars(tags, heights, hatches, items_for_argsort, fname, figh, ylabel, re
     pp.yticks(fontsize=12)
     pp.legend(legend_items, legend_names, prop={'size': 12})
     pp.savefig(fpath, bbox_inches='tight')
+    if plot_png:
+        fpath = fpath.replace('.pdf', '.png')
+        pp.savefig(fpath, bbox_inches='tight')
     pp.close()
 
 if __name__ == '__main__':
@@ -119,7 +122,7 @@ if __name__ == '__main__':
 
     S = S / np.sum(S, 1)[:, None]
     S = np.sum(S, 0)
-    plot_bars(tags, S, hatches, S, 'features_ranked', 7, 'Feature importance score', True)
+    plot_bars(tags, S, hatches, S, 'features_ranked', 7, 'Feature importance score', reverse=True, plot_png=True)
 
 
 
