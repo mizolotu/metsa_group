@@ -63,7 +63,7 @@ if __name__ == '__main__':
         b = np.abs(s[i, :])
         idxa = np.argsort(a)
         idxb = np.argsort(b)
-        print(i, tags_[i], tags_[idxa[-2]], r[i, idxa[-2]], tags_[idxb[-2]], s[i, idxb[-2]])
+        print(tags_[i], tags_[idxa[-2]], r[i, idxa[-2]], tags_[idxa[-3]], r[i, idxa[-3]], tags_[idxb[-2]], s[i, idxb[-2]], tags_[idxb[-3]], s[i, idxb[-3]])
 
     # data frames and colormap
 
