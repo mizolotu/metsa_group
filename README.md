@@ -52,4 +52,4 @@ python3 plot_feature_importance.py
 ```bash
 python3 plot_feature_values.py -f <feature name, e.g. 126A0333-QI>
 ```
-<img src="figures/predict_bleach_ratio/126A0333-QI_vs_126A0466-QI.png" width="250"/> <img src="figures/predict_bleach_ratio/126A0535-QIC_vs_126A0466-QI.png" width="250"/> <img src="figures/predict_bleach_ratio/126A0118-QI_vs_126A0466-QI.png" width="250"/> 
+<img src="figures/predict_bleach_ratio/126A0333-QI_vs_126A0466-QI.png" width="280"/> <img src="figures/predict_bleach_ratio/126A0535-QIC_vs_126A0466-QI.png" width="280"/> <img src="figures/predict_bleach_ratio/126A0118-QI_vs_126A0466-QI.png" width="280"/> 
