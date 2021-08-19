@@ -14,7 +14,7 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Plot feature importance')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-f', '--feature', help='Feature to plot', default='126A0503-QI.A2') # '126A0118-QI' '126A0333-QI' '126A0519-QI' '126A0535-QIC' '126A0546-QI1' 126A0224-FIC.A3 126A0503-QI.A2 126A0535-QIC 126A0519-QI
+    parser.add_argument('-f', '--feature', help='Feature to plot', default='126A0118-QI') # '126A0118-QI' '126A0333-QI' '126A0519-QI' '126A0535-QIC' '126A0546-QI1' 126A0224-FIC.A3 126A0503-QI.A2 126A0535-QIC 126A0519-QI
     parser.add_argument('-y', '--target', help='Target to plot feature against', default=br_key) # 126A0079-QT 126A0318-QI
     parser.add_argument('-p', '--permute', help='Plot feature permuted?', type=bool, default=False)
     parser.add_argument('-n', '--nfeatures', help='Number of features to plot', type=int, default=50000)
@@ -74,5 +74,7 @@ if __name__ == '__main__':
     pp.ylabel(br_key, fontdict={'size': 6})
     pp.xticks(fontsize=6)
     pp.yticks(fontsize=6)
+    pp.savefig(fpath, bbox_inches='tight')
+    fpath = fpath.replace('.pdf', '.png')
     pp.savefig(fpath, bbox_inches='tight')
     pp.close()
