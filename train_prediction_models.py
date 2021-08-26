@@ -22,7 +22,7 @@ def load_data(dpath, task, tags):
         Y[stage] = df[br_key].values
     return X, Y, T
 
-def mlp(nfeatures, nhiddens, xmin, xmax, ymin, ymax, latent_dim=64, nhidden=2048, batchnorm=True, dropout=0.5, lr=2.5e-4):
+def mlp(nfeatures, xmin, xmax, ymin, ymax, latent_dim=64, nhidden=2048, layers=[2048, 2048], batchnorm=True, dropout=0.5, lr=2.5e-4):
     nfeatures_sum = np.sum(nfeatures)
     inputs = tf.keras.layers.Input(shape=(nfeatures_sum,))
     inputs_std = (inputs - xmin) / (xmax - xmin + eps)
@@ -37,7 +37,7 @@ def mlp(nfeatures, nhiddens, xmin, xmax, ymin, ymax, latent_dim=64, nhidden=2048
     hidden = tf.stack(hidden, axis=1)
     hidden = tf.keras.layers.Flatten()(hidden)
     hidden = tf.keras.layers.Dense(nhidden, activation='relu')(hidden)
-    for nh in nhiddens:
+    for nh in layers:
         hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
         if dropout is not None:
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
@@ -47,7 +47,7 @@ def mlp(nfeatures, nhiddens, xmin, xmax, ymin, ymax, latent_dim=64, nhidden=2048
     model.compile(loss=tf.keras.losses.MeanAbsoluteError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
     return model
 
-def cnn(nfeatures, nhiddens, xmin, xmax, ymin, ymax, latent_dim=64, nfilters=1024, kernel_size=3, batchnorm=True, dropout=0.5, lr=2.5e-4):
+def cnn(nfeatures, xmin, xmax, ymin, ymax, latent_dim=64, nfilters=1024, kernel_size=3, layers=[2048, 2048], batchnorm=True, dropout=0.5, lr=2.5e-4):
     nfeatures_sum = np.sum(nfeatures)
     inputs = tf.keras.layers.Input(shape=(nfeatures_sum,))
     inputs_std = (inputs - xmin) / (xmax - xmin + eps)
@@ -63,7 +63,7 @@ def cnn(nfeatures, nhiddens, xmin, xmax, ymin, ymax, latent_dim=64, nfilters=102
     hidden = tf.keras.layers.Conv1D(nfilters, kernel_size, activation='relu')(hidden)
     hidden = tf.keras.layers.Conv1D(nfilters, kernel_size, activation='relu')(hidden)
     hidden = tf.keras.layers.Flatten()(hidden)
-    for nh in nhiddens:
+    for nh in layers:
         hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
         if dropout is not None:
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
@@ -82,7 +82,7 @@ def attention_block(x, nh):
     h = tf.keras.layers.Multiply()([a, v])
     return h
 
-def att(nfeatures, nhiddens, xmin, xmax, ymin, ymax, latent_dim=64, attention_size=512, batchnorm=True, dropout=0.5, lr=2.5e-4):
+def att(nfeatures, xmin, xmax, ymin, ymax, latent_dim=64, attention_size=512, layers=[2048, 2048], batchnorm=True, dropout=0.5, lr=2.5e-4):
     nfeatures_sum = np.sum(nfeatures)
     inputs = tf.keras.layers.Input(shape=(nfeatures_sum,))
     inputs_std = (inputs - xmin) / (xmax - xmin + eps)
@@ -97,7 +97,7 @@ def att(nfeatures, nhiddens, xmin, xmax, ymin, ymax, latent_dim=64, attention_si
     hidden = tf.stack(hidden, axis=1)
     hidden = attention_block(hidden, attention_size)
     hidden = tf.keras.layers.Flatten()(hidden)
-    for nh in nhiddens:
+    for nh in layers:
         hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
         if dropout is not None:
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
@@ -114,11 +114,11 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Train classifiers')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-e', '--extractor', help='feature extractor', default='mlp')
-    parser.add_argument('-l', '--layers', help='Number of neurons in the last fully-connected layers', default=[2048, 2048], type=int, nargs='+')
+    parser.add_argument('-d', '--delays', help='Delay class combinations', nargs='+')
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
     parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
-    parser.add_argument('-y', '--ylimits', help='Use bleach ratio limits found from the data?', default=False, type=bool)
+    parser.add_argument('-y', '--ylimits', help='Use bleach ratio limits from data?', default=False, type=bool)
     args = parser.parse_args()
 
     # cuda
@@ -137,10 +137,13 @@ if __name__ == '__main__':
     tag_keys = sorted(tags.keys())
     tags_ = []
     nfeatures = []
+    dc_combs = []
+    dcs = []
     for key in tag_keys:
+        dcs.extend(str(key))
         tags_.extend(tags[key])
         nfeatures.append(len(tags[key]))
-
+        dc_combs.append(','.join([item for item in dcs]))
     xmin = np.array(meta['xmin'])
     xmax = np.array(meta['xmax'])
 
@@ -151,6 +154,11 @@ if __name__ == '__main__':
         ymin = br_min
         ymax = br_max
 
+    # delay classes combination
+
+    if args.delays is not None:
+        dc_combs = args.delays
+
     # create output directories
 
     task_models_dir = osp.join(models_dir, args.task)
@@ -159,81 +167,100 @@ if __name__ == '__main__':
         if not osp.isdir(d):
             os.mkdir(d)
 
-    # load data
+    # loop through delay class combinations in reverse
 
-    X, Y, T = load_data(processed_data_dir, args.task, tags_)
+    for dc_comb in dc_combs.reverse():
 
-    # model
+        # load data
 
-    model_type = locals()[args.extractor]
-    model_name = f"{args.extractor}_{'-'.join([str(item) for item in args.layers])}"
+        X, Y, T = load_data(processed_data_dir, args.task, tags_)
 
-    # results table
+        # model
 
-    r_name = prediction_results_csv
-    r_path = osp.join(task_results_dir, r_name)
-    try:
-        p = pd.read_csv(r_path)
-        if model_name not in p.keys():
-            p[model_name] = [np.nan for tag in tags_]
-    except:
-        p = pd.DataFrame({
-            'Timestamp': [value for value in T['inference']],
-            'Value': [value for value in Y['inference']],
-            model_name: [np.nan for _ in Y['inference']]
-        })
+        model_type = locals()[args.extractor]
+        model_name = f"{args.extractor}_{','.join([str(item) for item in args.delays])}"
 
-    # create model
+        # results tables
 
-    model = model_type(nfeatures, args.layers, xmin, xmax, ymin, ymax)
-    if args.verbose:
-        model.summary()
+        e_path = osp.join(task_results_dir, prediction_errors_csv)
+        r_path = osp.join(task_results_dir, prediction_results_csv)
 
-    # create model and results directories
+        try:
+            pe = pd.read_csv(e_path)
+            if args.extractor not in pe.keys():
+                pe[args.extractor] = [np.nan for comb in dc_combs]
+        except:
+            pe = pd.DataFrame({
+                'Delay class combination': [comb for comb in dc_combs],
+                args.extractor: [np.nan for value in dc_combs]
+            })
 
-    m_path = osp.join(task_models_dir, model_name)
-    if not osp.isdir(m_path):
-        os.mkdir(m_path)
+        try:
+            pr = pd.read_csv(r_path)
+            if model_name not in pr.keys():
+                pr[model_name] = [np.nan for _ in Y['inference']]
+        except:
+            pr = pd.DataFrame({
+                ts_key: [value for value in T['inference']],
+                br_key: [value for value in Y['inference']],
+                model_name: [np.nan for _ in Y['inference']]
+            })
 
-    # load model
+        # create model
 
-    try:
-        model = tf.keras.models.load_model(m_path)
+        model = model_type(nfeatures, xmin, xmax, ymin, ymax)
+        if args.verbose:
+            model.summary()
 
-    except Exception as e:
-        print(e)
+        # create model and results directories
 
-        # train model
+        m_path = osp.join(task_models_dir, model_name)
+        if not osp.isdir(m_path):
+            os.mkdir(m_path)
 
-        model.fit(
-            X['train'], Y['train'],
-            validation_data=(X['validate'], Y['validate']),
-            epochs=epochs,
-            verbose=args.verbose,
-            batch_size=batch_size,
-            callbacks=[tf.keras.callbacks.EarlyStopping(
-                monitor='val_loss',
-                verbose=False,
-                patience=patience,
-                mode='min',
-                restore_best_weights=True
-            )]
-        )
+        # load model
 
-        # save model
+        try:
+            model = tf.keras.models.load_model(m_path)
 
-        model.save(m_path)
+        except Exception as e:
+            print(e)
 
-    # load data and calculate prediction error
+            # train model
 
-    predictions = model.predict(X['inference']).flatten()
-    assert len(predictions) == len(Y['inference'])
-    error = np.mean(np.abs(Y['inference'] - predictions))
-    X = np.vstack(X)
-    Y = np.hstack(Y)
-    print(f'Prediction error: {error}')
+            model.fit(
+                X['train'], Y['train'],
+                validation_data=(X['validate'], Y['validate']),
+                epochs=epochs,
+                verbose=args.verbose,
+                batch_size=batch_size,
+                callbacks=[tf.keras.callbacks.EarlyStopping(
+                    monitor='val_loss',
+                    verbose=False,
+                    patience=patience,
+                    mode='min',
+                    restore_best_weights=True
+                )]
+            )
 
-    # save results
+            # save model
 
-    p[model_name].values[:] = predictions
-    p.to_csv(r_path, index=None)
+            model.save(m_path)
+
+        # load data and calculate prediction error
+
+        predictions = model.predict(X['inference']).flatten()
+        assert len(predictions) == len(Y['inference'])
+        error = np.mean(np.abs(Y['inference'] - predictions))
+        X = np.vstack(X)
+        Y = np.hstack(Y)
+        print(f'Prediction error: {error}')
+
+        # save results
+
+        assert dc_comb in dc_combs
+        idx = dc_combs.index(dc_comb)
+        pe[args.extractor].values[idx] = error
+        pe.to_csv(e_path, index=None)
+        pr[model_name].values[:] = predictions
+        pr.to_csv(r_path, index=None)

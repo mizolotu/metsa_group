@@ -11,6 +11,7 @@ correlation_csv = 'correlation.csv'
 prediction_error_csv = 'prediction_error.csv'
 permutation_error_csv = 'permutation_error.csv'
 prediction_results_csv = 'prediction_results.csv'
+prediction_errors_csv = 'prediction_errors.csv'
 
 # data
 
@@ -30,7 +31,7 @@ nan_value = -1
 
 seed = 0
 batch_size = 512
-epochs = 10000
+epochs = 1#0000
 patience = 100
 
 # other
