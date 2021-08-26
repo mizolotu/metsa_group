@@ -26,15 +26,22 @@ def load_tags(fname, remove_yellow=False):
         tags = None
     return tags
 
-def load_samples(fname):
-    if fname in os.listdir(raw_data_dir):
-        p = pd.read_csv(osp.join(raw_data_dir, fname))
-        keys = p.keys().tolist()[1:]
+def load_samples(dpath):
+    keys = None
+    timestamps, values = [], []
+    for fname in os.listdir(dpath):
+        if osp.isfile(osp.join(dpath, fname)) and fname.endswith(csv):
+            p = pd.read_csv(osp.join(dpath, fname))
+            timestamps = np.hstack([timestamps, p[ts_key].values])
+            if keys is not None:
+                assert keys == [key for key in p.keys() if key != ts_key]
+            else:
+                keys = [key for key in p.keys() if key != ts_key]
+            values.append(p[keys].values)
+    if keys is not None:
         keys = [key.replace('_', '.') for key in keys]
-        values = p.values[:, 1:]
-        timestamps = np.array([time.mktime(dparser.parse(item).timetuple()) for item in p.values[:, 0]])
-    else:
-        keys, values, timestamps = None, None, None
+    if len(values) > 0:
+        values = np.vstack(values)
     return keys, values, timestamps
 
 def select_keys(keys, values, tags):
@@ -60,15 +67,12 @@ def sort_by_delay_class(keys, values, tags):
                 print(f'No values in column {tag}?')
     return [keys[i] for i in key_indexes_sorted], values[:, key_indexes_sorted]
 
-def select_values(values, labels, timestamps, tstart=None, label_thr=80.0):
-    idx = np.argsort(timestamps)
+def select_values(values, labels, timestamps, label_thr=80.0):
+    u, idx = np.unique(timestamps, return_index=True)
     values = values[idx, :]
     labels = labels[idx]
     timestamps = timestamps[idx]
-    if tstart is None:
-        idx = np.where((pd.isna(labels) == False) & (labels > label_thr))[0]
-    else:
-        idx = np.where(timestamps > tstart)[0]
+    idx = np.where((pd.isna(labels) == False) & (labels > label_thr))[0]
     return values[idx, :], labels[idx], timestamps[idx]
 
 if __name__ == '__main__':
@@ -77,17 +81,18 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-s', '--samples', help='File with samples', default='some_samples.csv')
     args = parser.parse_args()
 
     # laod data
 
     tags = load_tags(tags_fname)
-    keys, values, timestamps = load_samples(args.samples)
-    assert len(keys) == values.shape[1]
+    keys, values, timestamps = load_samples(raw_data_dir)
+    assert keys is not None, 'No data?'
+    assert len(keys) == values.shape[1], 'Number of keys is not equal to the number of value columns'
     keys, values, labels = select_keys(keys, values, tags)
-    assert len(keys) == values.shape[1]
+    assert len(keys) == values.shape[1], 'Number of keys is not equal to the number of value columns'
     values, labels, timestamps = select_values(values, labels, timestamps)
+    print(f'Data sample timestamps are between {np.min(timestamps)} and {np.max(timestamps)}')
 
     # set seed for results reproduction
 
@@ -106,12 +111,13 @@ if __name__ == '__main__':
 
     # bleach ratio limits
 
-    y_min = np.maximum(br_min, np.min(labels))
-    y_max = np.minimum(br_max, np.max(labels))
+    y_min = np.min(labels)
+    y_max = np.max(labels)
+    print(f'Data sample labels are between {y_min} and {y_max}')
 
     # meta
 
-    meta = {'tags': {}, 'ntrain': len(tr), 'nvalidate': len(val), 'ninference': len(te), 'xmin': [], 'xmax': [], 'ymin': y_min, 'ymax': y_max}
+    meta = {'tags': {}, 'ntrain': len(tr), 'nvalidate': len(val), 'ninference': len(te), 'xmin': [], 'xmax': []}
 
     # output directory
 
@@ -135,24 +141,25 @@ if __name__ == '__main__':
 
         xmin = np.nanmin(values_, axis=0)
         xmax = np.nanmax(values_, axis=0)
-        meta['xmin'].append(xmin)
-        meta['xmax'].append(xmax)
         values_std = (values_ - xmin[None, :]) / (xmax[None, :] - xmin[None, :] + eps)
         values_std[np.where(pd.isna(values_std))] = nan_value
         values_no_nan = values_std * (xmax[None, :] - xmin[None, :]) + xmin[None, :]
         vals.append(values_no_nan)
     tag_names.append(br_key)
     vals = np.hstack(vals)
-    meta['xmin'] = np.hstack(meta['xmin']).tolist()
-    meta['xmax'] = np.hstack(meta['xmax']).tolist()
 
     # save datasets
 
     for fi, stage in enumerate(stages):
         fname = f'{args.task}_{stage}{csv}'
         fpath = osp.join(processed_data_dir, fname)
-        data = np.hstack([vals[inds_splitted[fi], :], labels[inds_splitted[fi], None]])
-        pd.DataFrame(data, columns=tag_names).to_csv(fpath, mode='w', index=False)
+        data = np.hstack([timestamps[inds_splitted[fi], None], vals[inds_splitted[fi], :], labels[inds_splitted[fi], None]])
+        pd.DataFrame(data, columns=[ts_key] + tag_names).to_csv(fpath, mode='w', index=False)
+        if stage == 'train':
+            meta['xmin'] = np.min(vals[inds_splitted[fi], :], axis=0).tolist()
+            meta['xmax'] = np.max(vals[inds_splitted[fi], :], axis=0).tolist()
+            meta['ymin'] = np.min(labels[inds_splitted[fi]])
+            meta['ymax'] = np.max(labels[inds_splitted[fi]])
 
     # save meta
 

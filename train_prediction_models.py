@@ -9,19 +9,20 @@ import argparse as arp
 from config import *
 from calculate_prediction_error import set_seeds, load_meta
 
-def load_data(dpath, task):
+def load_data(dpath, task, tags):
     fnames = os.listdir(dpath)
-    X, Y = {}, {}
+    X, Y, T = {}, {}, {}
     for stage in stages:
         fpath = [osp.join(dpath, fname) for fname in fnames if osp.isfile(osp.join(dpath, fname)) and fname.startswith(task) and fname.endswith(f'{stage}{csv}')]
         assert len(fpath) == 1
         fpath = fpath[0]
-        vals = pd.read_csv(fpath).values
-        X[stage] = vals[:, :-1]
-        Y[stage] = vals[:, -1]
-    return X, Y
+        df = pd.read_csv(fpath)
+        X[stage] = df[tags].values
+        T[stage] = df[ts_key].values
+        Y[stage] = df[br_key].values
+    return X, Y, T
 
-def mlp(nfeatures, nhiddens, xmin, xmax, ymin, ymax, latent_dim=64, batchnorm=True, dropout=0.5, lr=2.5e-4):
+def mlp(nfeatures, nhiddens, xmin, xmax, ymin, ymax, latent_dim=64, nhidden=2048, batchnorm=True, dropout=0.5, lr=2.5e-4):
     nfeatures_sum = np.sum(nfeatures)
     inputs = tf.keras.layers.Input(shape=(nfeatures_sum,))
     inputs_std = (inputs - xmin) / (xmax - xmin + eps)
@@ -35,6 +36,7 @@ def mlp(nfeatures, nhiddens, xmin, xmax, ymin, ymax, latent_dim=64, batchnorm=Tr
         hidden.append(tf.keras.layers.Dense(latent_dim, activation='relu')(spl))
     hidden = tf.stack(hidden, axis=1)
     hidden = tf.keras.layers.Flatten()(hidden)
+    hidden = tf.keras.layers.Dense(nhidden, activation='relu')(hidden)
     for nh in nhiddens:
         hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
         if dropout is not None:
@@ -45,7 +47,7 @@ def mlp(nfeatures, nhiddens, xmin, xmax, ymin, ymax, latent_dim=64, batchnorm=Tr
     model.compile(loss=tf.keras.losses.MeanAbsoluteError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
     return model
 
-def cnn(nfeatures, nhiddens, xmin, xmax, ymin, ymax, latent_dim=64, nfilters=512, kernel_size=3, batchnorm=True, dropout=0.5, lr=2.5e-4):
+def cnn(nfeatures, nhiddens, xmin, xmax, ymin, ymax, latent_dim=64, nfilters=1024, kernel_size=3, batchnorm=True, dropout=0.5, lr=2.5e-4):
     nfeatures_sum = np.sum(nfeatures)
     inputs = tf.keras.layers.Input(shape=(nfeatures_sum,))
     inputs_std = (inputs - xmin) / (xmax - xmin + eps)
@@ -159,7 +161,7 @@ if __name__ == '__main__':
 
     # load data
 
-    X, Y = load_data(processed_data_dir, args.task)
+    X, Y, T = load_data(processed_data_dir, args.task, tags_)
 
     # model
 
@@ -176,7 +178,8 @@ if __name__ == '__main__':
             p[model_name] = [np.nan for tag in tags_]
     except:
         p = pd.DataFrame({
-            'Label': [value for value in Y['inference']],
+            'Timestamp': [value for value in T['inference']],
+            'Value': [value for value in Y['inference']],
             model_name: [np.nan for _ in Y['inference']]
         })
 

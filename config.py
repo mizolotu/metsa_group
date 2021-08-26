@@ -14,6 +14,7 @@ prediction_results_csv = 'prediction_results.csv'
 
 # data
 
+ts_key = 'LDTS'
 br_key = '126A0466-QI'
 br_min = 86.0
 br_max = 92.0
