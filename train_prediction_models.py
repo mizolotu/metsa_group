@@ -11,78 +11,71 @@ from calculate_prediction_error import set_seeds, load_meta
 
 def load_data(dpath, task, tags):
     fnames = os.listdir(dpath)
-    X, Y, T = {}, {}, {}
+    values, labels, timestamps = {}, {}, {}
     for stage in stages:
         fpath = [osp.join(dpath, fname) for fname in fnames if osp.isfile(osp.join(dpath, fname)) and fname.startswith(task) and fname.endswith(f'{stage}{csv}')]
         assert len(fpath) == 1
         fpath = fpath[0]
         df = pd.read_csv(fpath)
-        X[stage] = df[tags].values
-        T[stage] = df[ts_key].values
-        Y[stage] = df[br_key].values
-    return X, Y, T, tags.copy()
+        values[stage] = df[tags].values
+        labels[stage] = df[br_key].values
+        timestamps[stage] = df[ts_key].values
+    return values, labels, timestamps, tags.copy()
 
-def pad_data(X, data_tags, dc_comb, tags, xmin):
-    pad_ids = []
-    tag_keys = sorted(tags.keys())
-    dc_comb = dc_comb.split(',')
-    for key in tag_keys:
-        if key not in dc_comb:
-            pad_ids = np.hstack([pad_ids, [data_tags.index(tag) for tag in tags[key] if tag in data_tags]])
-    X_padded = {}
-    for stage in stages:
-        X_padded[stage] = X[stage][: pad_ids]
+def pad_data(X, x_features, features, delay_classes, dc_comb):
+    nan_cols = []
+    dc_comb = [int(dc) for dc in dc_comb.split(',')]
+    for i, xf in enumerate(x_features):
+        dc = delay_classes[features.index(xf)]
+        if dc not in dc_comb:
+            nan_cols.append(i)
+    X_padded = X.copy()
+    X_padded[:, nan_cols] = np.nan
+    return X_padded
 
-def mlp(nfeatures, xmin, xmax, ymin, ymax, latent_dim=64, nhidden=2048, layers=[2048, 2048], batchnorm=True, dropout=0.5, lr=2.5e-4):
+def model_input(nfeatures, xmin, xmax, latent_dim=64, batchnorm=False):
+
+    # input layer
+
     nfeatures_sum = np.sum(nfeatures)
     inputs = tf.keras.layers.Input(shape=(nfeatures_sum,))
-    inputs_std = (inputs - xmin) / (xmax - xmin + eps)
+
+    # deal with nans
+
+    is_nan = tf.math.is_nan(inputs)
+    masks = tf.dtypes.cast(-xmax, tf.float32)
+    inputs_nan = tf.dtypes.cast(is_nan, dtype=tf.float32)
+    inputs_not_nan = tf.dtypes.cast(tf.math.logical_not(is_nan), dtype=tf.float32)
+    inputs_without_nan = tf.math.multiply_no_nan(inputs, inputs_not_nan) + tf.math.multiply_no_nan(masks, inputs_nan)
+
+    # standardize the input
+
+    inputs_std = (inputs_without_nan - xmin) / (xmax - xmin + eps)
     if batchnorm:
         hidden = tf.keras.layers.BatchNormalization()(inputs_std)
     else:
         hidden = inputs_std
+
+    # split, stack and flatten
+
     hidden_spl = tf.split(hidden, nfeatures, axis=1)
     hidden = []
     for spl in hidden_spl:
         hidden.append(tf.keras.layers.Dense(latent_dim, activation='relu')(spl))
     hidden = tf.stack(hidden, axis=1)
+
+    return inputs, hidden
+
+def mlp(hidden, nhidden=2048):
     hidden = tf.keras.layers.Flatten()(hidden)
     hidden = tf.keras.layers.Dense(nhidden, activation='relu')(hidden)
-    for nh in layers:
-        hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
-        if dropout is not None:
-            hidden = tf.keras.layers.Dropout(dropout)(hidden)
-    outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
-    outputs = outputs * (ymax - ymin) + ymin
-    model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-    model.compile(loss=tf.keras.losses.MeanAbsoluteError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
-    return model
+    return hidden
 
-def cnn(nfeatures, xmin, xmax, ymin, ymax, latent_dim=64, nfilters=1024, kernel_size=3, layers=[2048, 2048], batchnorm=True, dropout=0.5, lr=2.5e-4):
-    nfeatures_sum = np.sum(nfeatures)
-    inputs = tf.keras.layers.Input(shape=(nfeatures_sum,))
-    inputs_std = (inputs - xmin) / (xmax - xmin + eps)
-    if batchnorm:
-        hidden = tf.keras.layers.BatchNormalization()(inputs_std)
-    else:
-        hidden = inputs_std
-    hidden_spl = tf.split(hidden, nfeatures, axis=1)
-    hidden = []
-    for spl in hidden_spl:
-        hidden.append(tf.keras.layers.Dense(latent_dim, activation='relu')(spl))
-    hidden = tf.stack(hidden, axis=1)
+def cnn(hidden, nfilters=1024, kernel_size=3):
     hidden = tf.keras.layers.Conv1D(nfilters, kernel_size, activation='relu')(hidden)
     hidden = tf.keras.layers.Conv1D(nfilters, kernel_size, activation='relu')(hidden)
     hidden = tf.keras.layers.Flatten()(hidden)
-    for nh in layers:
-        hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
-        if dropout is not None:
-            hidden = tf.keras.layers.Dropout(dropout)(hidden)
-    outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
-    outputs = outputs * (ymax - ymin) + ymin
-    model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-    model.compile(loss=tf.keras.losses.MeanAbsoluteError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
-    return model
+    return hidden
 
 def attention_block(x, nh):
     q = tf.keras.layers.Dense(nh, use_bias=False)(x)
@@ -93,26 +86,17 @@ def attention_block(x, nh):
     h = tf.keras.layers.Multiply()([a, v])
     return h
 
-def att(nfeatures, xmin, xmax, ymin, ymax, latent_dim=64, attention_size=512, layers=[2048, 2048], batchnorm=True, dropout=0.5, lr=2.5e-4):
-    nfeatures_sum = np.sum(nfeatures)
-    inputs = tf.keras.layers.Input(shape=(nfeatures_sum,))
-    inputs_std = (inputs - xmin) / (xmax - xmin + eps)
-    if batchnorm:
-        hidden = tf.keras.layers.BatchNormalization()(inputs_std)
-    else:
-        hidden = inputs_std
-    hidden_spl = tf.split(hidden, nfeatures, axis=1)
-    hidden = []
-    for spl in hidden_spl:
-        hidden.append(tf.keras.layers.Dense(latent_dim, activation='relu')(spl))
-    hidden = tf.stack(hidden, axis=1)
+def att(hidden, attention_size=512):
     hidden = attention_block(hidden, attention_size)
     hidden = tf.keras.layers.Flatten()(hidden)
+    return hidden
+
+def model_output(inputs, hidden, ymin, ymax, layers=[2048, 2048], dropout=0.5, lr=2.5e-4):
     for nh in layers:
         hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
         if dropout is not None:
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
-    outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
+    outputs = tf.keras.layers.Dense(1, activation='linear')(hidden)
     outputs = outputs * (ymax - ymin) + ymin
     model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
     model.compile(loss=tf.keras.losses.MeanAbsoluteError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
@@ -144,17 +128,15 @@ if __name__ == '__main__':
     # tags and standardization values
 
     meta = load_meta(processed_data_dir, args.task)
-    tags = meta['tags']
-    tag_keys = sorted(tags.keys())
-    tags_ = []
+    features = meta['features']
+    classes = meta['classes']
     nfeatures = []
     dcs = []
-    dc_combs = []
-    for key in tag_keys:
-        dcs.extend(str(key))
-        tags_.extend(tags[key])
-        nfeatures.append(len(tags[key]))
-        dc_combs.append(','.join([item for item in dcs]))
+    tbl_dc_combs = []
+    for uc in np.sort(np.unique(classes)):
+        dcs.extend(str(uc))
+        nfeatures.append(len([c for c in classes if c == uc]))
+        tbl_dc_combs.append(','.join([item for item in dcs]))
     xmin = np.array(meta['xmin'])
     xmax = np.array(meta['xmax'])
 
@@ -165,14 +147,36 @@ if __name__ == '__main__':
         ymin = br_min
         ymax = br_max
 
-    # load data
-
-    X, Y, T, data_tags = load_data(processed_data_dir, args.task, tags_)
-
     # delay classes combination
 
     if args.delays is not None:
         dc_combs = args.delays
+    else:
+        dc_combs = tbl_dc_combs
+
+    # load data
+
+    vals, labels, timestamps, val_features = load_data(processed_data_dir, args.task, features)
+
+    # create datasets by padding certain feature classes
+
+    Xtv, Ytv = {}, {}
+
+    for stage in stages[:-1]:
+        Xtv[stage] = []
+        Ytv[stage] = []
+        for dc_comb in dc_combs:
+            Xtv[stage].append(pad_data(vals[stage], val_features, features, classes, dc_comb))
+            Ytv[stage].append(labels[stage])
+        Xtv[stage] = np.vstack(Xtv[stage])
+        Ytv[stage] = np.hstack(Ytv[stage])
+
+    stage = stages[-1]
+    Xi = {}
+    for dc_comb in dc_combs:
+        Xi[dc_comb] = pad_data(vals[stage], val_features, features, classes, dc_comb)
+    Yi = labels[stage]
+    Ti = timestamps[stage]
 
     # create output directories
 
@@ -182,100 +186,91 @@ if __name__ == '__main__':
         if not osp.isdir(d):
             os.mkdir(d)
 
-    # loop through delay class combinations in reverse
+    # model
 
-    for dc_comb in dc_combs:#.reverse():
+    inputs, hidden = model_input(nfeatures, xmin, xmax)
+    extractor_type = locals()[args.extractor]
+    hidden = extractor_type(hidden)
+    model = model_output(inputs, hidden, ymin, ymax)
+    model_name = args.extractor
+    if args.verbose:
+        model.summary()
 
-        # pad data
+    # results tables
 
-        X_padded = pad_data(X, data_tags, dc_comb, tags)
+    e_path = osp.join(task_results_dir, prediction_errors_csv)
+    r_path = osp.join(task_results_dir, prediction_results_csv)
 
-        # model
+    try:
+        pe = pd.read_csv(e_path)
+    except:
+        pe = pd.DataFrame({
+            'Delay classes': [comb for comb in tbl_dc_combs]
+        })
+    if model_name not in pe.keys():
+        pe[model_name] = [np.nan for comb in tbl_dc_combs]
 
-        model_type = locals()[args.extractor]
-        model_name = f"{args.extractor}_{','.join([str(item) for item in args.delays])}"
+    try:
+        pr = pd.read_csv(r_path)
+    except:
+        pr = pd.DataFrame({
+            ts_key: [value for value in Ti],
+            br_key: [value for value in Yi],
+        })
+    for dc_comb in tbl_dc_combs:
+        model_comb = f'{model_name}_{dc_comb}'
+        if model_comb not in pr.keys():
+            pr[model_comb] = [np.nan for _ in Yi]
 
-        # results tables
+    # create model and results directories
 
-        e_path = osp.join(task_results_dir, prediction_errors_csv)
-        r_path = osp.join(task_results_dir, prediction_results_csv)
+    m_path = osp.join(task_models_dir, model_name)
+    if not osp.isdir(m_path):
+        os.mkdir(m_path)
 
-        try:
-            pe = pd.read_csv(e_path)
-            if args.extractor not in pe.keys():
-                pe[args.extractor] = [np.nan for comb in dc_combs]
-        except:
-            pe = pd.DataFrame({
-                'Delay class combination': [comb for comb in dc_combs],
-                args.extractor: [np.nan for value in dc_combs]
-            })
+    # load model
 
-        try:
-            pr = pd.read_csv(r_path)
-            if model_name not in pr.keys():
-                pr[model_name] = [np.nan for _ in Y['inference']]
-        except:
-            pr = pd.DataFrame({
-                ts_key: [value for value in T['inference']],
-                br_key: [value for value in Y['inference']],
-                model_name: [np.nan for _ in Y['inference']]
-            })
+    try:
+        model = tf.keras.models.load_model(m_path)
 
-        # create model
+    except Exception as e:
+        print(e)
 
-        model = model_type(nfeatures, xmin, xmax, ymin, ymax)
-        if args.verbose:
-            model.summary()
+        # train model
 
-        # create model and results directories
+        model.fit(
+            Xtv[stages[0]], Ytv[stages[0]],
+            validation_data=(Xtv[stages[1]], Ytv[stages[1]]),
+            epochs=epochs,
+            verbose=args.verbose,
+            batch_size=batch_size,
+            callbacks=[tf.keras.callbacks.EarlyStopping(
+                monitor='val_loss',
+                verbose=False,
+                patience=patience,
+                mode='min',
+                restore_best_weights=True
+            )]
+        )
 
-        m_path = osp.join(task_models_dir, model_name)
-        if not osp.isdir(m_path):
-            os.mkdir(m_path)
+        # save model
 
-        # load model
+        model.save(m_path)
 
-        try:
-            model = tf.keras.models.load_model(m_path)
+    # calculate prediction error for each class combination
 
-        except Exception as e:
-            print(e)
-
-            # train model
-
-            model.fit(
-                X['train'], Y['train'],
-                validation_data=(X['validate'], Y['validate']),
-                epochs=epochs,
-                verbose=args.verbose,
-                batch_size=batch_size,
-                callbacks=[tf.keras.callbacks.EarlyStopping(
-                    monitor='val_loss',
-                    verbose=False,
-                    patience=patience,
-                    mode='min',
-                    restore_best_weights=True
-                )]
-            )
-
-            # save model
-
-            model.save(m_path)
-
-        # load data and calculate prediction error
-
-        predictions = model.predict(X['inference']).flatten()
-        assert len(predictions) == len(Y['inference'])
-        error = np.mean(np.abs(Y['inference'] - predictions))
-        X = np.vstack(X)
-        Y = np.hstack(Y)
+    for dc_comb in dc_combs:
+        predictions = model.predict(Xi[dc_comb]).flatten()
+        assert len(predictions) == len(Yi)
+        error = np.mean(np.abs(Yi - predictions))
         print(f'Prediction error: {error}')
 
         # save results
 
-        assert dc_comb in dc_combs
-        idx = dc_combs.index(dc_comb)
+        assert dc_comb in tbl_dc_combs
+        idx = tbl_dc_combs.index(dc_comb)
         pe[args.extractor].values[idx] = error
         pe.to_csv(e_path, index=None)
-        pr[model_name].values[:] = predictions
+        model_comb = f'{model_name}_{dc_comb}'
+        pr[model_comb].values[:] = predictions
         pr.to_csv(r_path, index=None)

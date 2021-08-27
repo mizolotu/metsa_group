@@ -17,6 +17,7 @@ prediction_errors_csv = 'prediction_errors.csv'
 
 ts_key = 'LDTS'
 br_key = '126A0466-QI'
+br_thr = 80.0
 br_min = 86.0
 br_max = 92.0
 stages = ['training', 'validation', 'inference']
