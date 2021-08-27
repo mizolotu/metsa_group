@@ -92,6 +92,7 @@ def att(hidden, attention_size=512):
     return hidden
 
 def rnn(hidden, nhidden=640):
+    hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
     hidden = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(nhidden, activation='relu', return_sequences=False))(hidden)
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
@@ -196,7 +197,7 @@ if __name__ == '__main__':
 
     # model name
 
-    model_name = args.extractor
+    model_name = f'{args.extractor}_{args.delay}'
 
     # results tables
 
@@ -236,7 +237,7 @@ if __name__ == '__main__':
         try:
             model = tf.keras.models.load_model(m_path)
             have_to_create_model = False
-            print(f'Model {model_name} have been loaded from {m_path}')
+            print(f'Model {model_name} has been loaded from {m_path}')
         except Exception as e:
             print(e)
             have_to_create_model = True
@@ -293,7 +294,7 @@ if __name__ == '__main__':
 
         assert dc_comb in tbl_dc_combs
         idx = tbl_dc_combs.index(dc_comb)
-        pe[args.extractor].values[idx] = error
+        pe[model_name].values[idx] = error
         pe.to_csv(e_path, index=None)
         model_comb = f'{model_name}_{dc_comb}'
         pr[model_comb].values[:] = predictions
