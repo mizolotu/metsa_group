@@ -1,6 +1,5 @@
 import os
 import os.path as osp
-import sys
 
 import pandas as pd
 import tensorflow as tf
@@ -92,6 +91,12 @@ def att(hidden, attention_size=512):
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
+def rnn(hidden, nunists=[384, 384]):
+    for nhidden in nunists:
+        hidden = tf.keras.layers.LSTM(nhidden, activation='relu', return_sequences=True)(hidden)
+    hidden = tf.keras.layers.Flatten()(hidden)
+    return hidden
+
 def model_output(inputs, hidden, ymin, ymax, layers=[2048, 2048], dropout=0.5, lr=2.5e-4):
     for nh in layers:
         hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
@@ -109,7 +114,7 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train classifiers')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-e', '--extractor', help='feature extractor', default='mlp')
+    parser.add_argument('-e', '--extractor', help='feature extractor', default='mlp', choices=['mlp', 'cnn', 'att', 'rnn'])
     parser.add_argument('-d', '--delay', help='Delay class when prediction starts', default='1')
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
