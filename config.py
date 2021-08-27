@@ -12,6 +12,7 @@ prediction_error_csv = 'prediction_error.csv'
 permutation_error_csv = 'permutation_error.csv'
 prediction_results_csv = 'prediction_results.csv'
 prediction_errors_csv = 'prediction_errors.csv'
+summary_txt = 'summary.txt'
 
 # data
 

@@ -1,5 +1,6 @@
 import os
 import os.path as osp
+import sys
 
 import pandas as pd
 import tensorflow as tf
@@ -109,11 +110,12 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Train classifiers')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-e', '--extractor', help='feature extractor', default='mlp')
-    parser.add_argument('-d', '--delays', help='Delay class combinations', nargs='+')
+    parser.add_argument('-d', '--delay', help='Delay class when prediction starts', default='1')
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
     parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
     parser.add_argument('-y', '--ylimits', help='Use bleach ratio limits from data?', default=False, type=bool)
+    parser.add_argument('-r', '--retrain', help='Retrain model?', default=False, type=bool)
     args = parser.parse_args()
 
     # cuda
@@ -149,10 +151,12 @@ if __name__ == '__main__':
 
     # delay classes combination
 
-    if args.delays is not None:
-        dc_combs = args.delays
+    if args.delay is not None:
+        dc_combs = [dc for dc in tbl_dc_combs if args.delay in dc]
     else:
         dc_combs = tbl_dc_combs
+
+    print(f'The following feature classes will be used to train the model: {dc_combs}')
 
     # load data
 
@@ -186,15 +190,9 @@ if __name__ == '__main__':
         if not osp.isdir(d):
             os.mkdir(d)
 
-    # model
+    # model name
 
-    inputs, hidden = model_input(nfeatures, xmin, xmax)
-    extractor_type = locals()[args.extractor]
-    hidden = extractor_type(hidden)
-    model = model_output(inputs, hidden, ymin, ymax)
     model_name = args.extractor
-    if args.verbose:
-        model.summary()
 
     # results tables
 
@@ -230,11 +228,31 @@ if __name__ == '__main__':
 
     # load model
 
-    try:
-        model = tf.keras.models.load_model(m_path)
+    if not args.retrain:
+        try:
+            model = tf.keras.models.load_model(m_path)
+            have_to_create_model = False
+            print(f'Model {model_name} have been loaded from {m_path}')
+        except Exception as e:
+            print(e)
+            have_to_create_model = True
+    else:
+        have_to_create_model = True
 
-    except Exception as e:
-        print(e)
+    # create a new model if needed
+
+    if have_to_create_model:
+
+        print(f'Training new model {model_name}:')
+        inputs, hidden = model_input(nfeatures, xmin, xmax)
+        extractor_type = locals()[args.extractor]
+        hidden = extractor_type(hidden)
+        model = model_output(inputs, hidden, ymin, ymax)
+        model_summary_lines = []
+        model.summary(print_fn=lambda x: model_summary_lines.append(x))
+        model_summary = "\n".join(model_summary_lines)
+        if args.verbose:
+            print(model_summary)
 
         # train model
 
@@ -256,6 +274,8 @@ if __name__ == '__main__':
         # save model
 
         model.save(m_path)
+        with open(osp.join(m_path, summary_txt), 'w') as f:
+            f.write(model_summary)
 
     # calculate prediction error for each class combination
 
@@ -263,7 +283,7 @@ if __name__ == '__main__':
         predictions = model.predict(Xi[dc_comb]).flatten()
         assert len(predictions) == len(Yi)
         error = np.mean(np.abs(Yi - predictions))
-        print(f'Prediction error: {error}')
+        print(f'Prediction error for combination {dc_comb}: {error}')
 
         # save results
 
