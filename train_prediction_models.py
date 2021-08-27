@@ -109,8 +109,10 @@ class Attention(tf.keras.layers.Layer):
     def get_config(self):
         return super(Attention, self).get_config()
 
-def att(hidden, nhidden=1024):
+def att(hidden, nhidden=640):
     #hidden = attention_block(hidden, attention_size)
+    hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
+    hidden = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden)
     hidden = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden)
     hidden = Attention()(hidden)
     #hidden = tf.keras.layers.Flatten()(hidden)
