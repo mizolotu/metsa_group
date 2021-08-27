@@ -20,7 +20,18 @@ def load_data(dpath, task, tags):
         X[stage] = df[tags].values
         T[stage] = df[ts_key].values
         Y[stage] = df[br_key].values
-    return X, Y, T
+    return X, Y, T, tags.copy()
+
+def pad_data(X, data_tags, dc_comb, tags, xmin):
+    pad_ids = []
+    tag_keys = sorted(tags.keys())
+    dc_comb = dc_comb.split(',')
+    for key in tag_keys:
+        if key not in dc_comb:
+            pad_ids = np.hstack([pad_ids, [data_tags.index(tag) for tag in tags[key] if tag in data_tags]])
+    X_padded = {}
+    for stage in stages:
+        X_padded[stage] = X[stage][: pad_ids]
 
 def mlp(nfeatures, xmin, xmax, ymin, ymax, latent_dim=64, nhidden=2048, layers=[2048, 2048], batchnorm=True, dropout=0.5, lr=2.5e-4):
     nfeatures_sum = np.sum(nfeatures)
@@ -137,8 +148,8 @@ if __name__ == '__main__':
     tag_keys = sorted(tags.keys())
     tags_ = []
     nfeatures = []
-    dc_combs = []
     dcs = []
+    dc_combs = []
     for key in tag_keys:
         dcs.extend(str(key))
         tags_.extend(tags[key])
@@ -153,6 +164,10 @@ if __name__ == '__main__':
     else:
         ymin = br_min
         ymax = br_max
+
+    # load data
+
+    X, Y, T, data_tags = load_data(processed_data_dir, args.task, tags_)
 
     # delay classes combination
 
@@ -169,11 +184,11 @@ if __name__ == '__main__':
 
     # loop through delay class combinations in reverse
 
-    for dc_comb in dc_combs.reverse():
+    for dc_comb in dc_combs:#.reverse():
 
-        # load data
+        # pad data
 
-        X, Y, T = load_data(processed_data_dir, args.task, tags_)
+        X_padded = pad_data(X, data_tags, dc_comb, tags)
 
         # model
 

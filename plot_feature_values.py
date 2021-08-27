@@ -14,8 +14,9 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Plot feature importance')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-f', '--feature', help='Feature to plot', default='126A0118-QI') # '126A0118-QI' '126A0333-QI' '126A0519-QI' '126A0535-QIC' '126A0546-QI1' 126A0224-FIC.A3 126A0503-QI.A2 126A0535-QIC 126A0519-QI
-    parser.add_argument('-y', '--target', help='Target to plot feature against', default=br_key) # 126A0079-QT 126A0318-QI
+    parser.add_argument('-f', '--feature', help='Feature to plot', default='126A0435-SI')
+    parser.add_argument('-s', '--size', help='Fgiure size', default=12, type=int)
+    parser.add_argument('-y', '--target', help='Target to plot feature against', default=br_key)
     parser.add_argument('-p', '--permute', help='Plot feature permuted?', type=bool, default=False)
     parser.add_argument('-n', '--nfeatures', help='Number of features to plot', type=int, default=50000)
     args = parser.parse_args()
@@ -64,16 +65,16 @@ if __name__ == '__main__':
     idx_ = np.where((x != meta['xmin'][idx]) & (y[idx] != ymin))[0]
     fname = f'{args.feature}_vs_{args.target}'.replace('.', '_')
     fpath = osp.join(task_figures_dir, f'{fname}{pdf}')
-    pp.figure(figsize=(6, 6))
+    pp.figure(figsize=(args.size, args.size))
     pp.plot(x[idx_[:args.nfeatures]], y[idx_[:args.nfeatures]], 'ko')
     if args.permute:
         idx_perm = np.arange(len(idx_))
         np.random.shuffle(idx_perm)
         pp.plot(x[idx_[idx_perm[:args.nfeatures]]], y[idx_[:args.nfeatures]], 'kx')
-    pp.xlabel(args.feature, fontdict={'size': 6})
-    pp.ylabel(br_key, fontdict={'size': 6})
-    pp.xticks(fontsize=6)
-    pp.yticks(fontsize=6)
+    pp.xlabel(args.feature, fontdict={'size': args.size})
+    pp.ylabel(br_key, fontdict={'size': args.size})
+    pp.xticks(fontsize=args.size)
+    pp.yticks(fontsize=args.size)
     pp.savefig(fpath, bbox_inches='tight')
     fpath = fpath.replace('.pdf', '.png')
     pp.savefig(fpath, bbox_inches='tight')

@@ -81,7 +81,7 @@ def att(nfeatures, nhiddens, xmin, xmax, ymin, ymax, latent_dim=64, attention_si
         hidden.append(tf.keras.layers.Dense(latent_dim, activation='relu')(spl))
     hidden = tf.stack(hidden, axis=1)
     hidden = attention_block(hidden, attention_size)
-    hidden = tf.keras.layers.Flatten()(hidden)
+    it pull
     for nh in nhiddens:
         hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
         if dropout is not None:
