@@ -91,9 +91,8 @@ def att(hidden, attention_size=512):
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
-def rnn(hidden, nunists=[384, 384]):
-    for nhidden in nunists:
-        hidden = tf.keras.layers.LSTM(nhidden, activation='relu', return_sequences=True)(hidden)
+def rnn(hidden, nhidden=640):
+    hidden = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(nhidden, activation='relu', return_sequences=False))(hidden)
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
