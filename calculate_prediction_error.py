@@ -18,19 +18,6 @@ def load_batches(path, tags, batch_size):
     )
     return batches
 
-def load_meta(fpath, prefix):
-    meta = None
-    try:
-        with open(osp.join(fpath, f'{prefix}_metainfo.json')) as f:
-            meta = json.load(f)
-    except Exception as e:
-        print(e)
-    return meta
-
-def set_seeds(seed):
-    tf.random.set_seed(seed)
-    np.random.seed(seed)
-
 def regression_mapper(features, label):
     features = tf.stack(list(features.values()), axis=-1)
     return features, label

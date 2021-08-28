@@ -2,16 +2,17 @@
 
 data_dir = 'data'
 raw_data_dir = f'{data_dir}/raw'
-processed_data_dir = f'{data_dir}/features'
 models_dir = 'models'
 results_dir = 'results'
 figures_dir = 'figures'
 tags_fname = 'tags.xlsx'
+features_fname = 'features.csv'
+meta_fname = 'metainfo.json'
 correlation_csv = 'correlation.csv'
 prediction_error_csv = 'prediction_error.csv'
 permutation_error_csv = 'permutation_error.csv'
-prediction_results_csv = 'prediction_results.csv'
-prediction_errors_csv = 'prediction_errors.csv'
+prediction_results_fname = 'prediction_results.csv'
+prediction_errors_fname = 'prediction_errors.csv'
 summary_txt = 'summary.txt'
 
 # data

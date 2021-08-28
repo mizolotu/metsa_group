@@ -1,4 +1,4 @@
-import os
+import os, json
 import os.path as osp
 
 import pandas as pd
@@ -7,19 +7,25 @@ import numpy as np
 import argparse as arp
 
 from config import *
-from calculate_prediction_error import set_seeds, load_meta
 
-def load_data(dpath, task, tags):
-    fnames = os.listdir(dpath)
-    values, labels, timestamps = {}, {}, {}
-    for stage in stages:
-        fpath = [osp.join(dpath, fname) for fname in fnames if osp.isfile(osp.join(dpath, fname)) and fname.startswith(task) and fname.endswith(f'{stage}{csv}')]
-        assert len(fpath) == 1
-        fpath = fpath[0]
-        df = pd.read_csv(fpath)
-        values[stage] = df[tags].values
-        labels[stage] = df[br_key].values
-        timestamps[stage] = df[ts_key].values
+def load_meta(fpath):
+    meta = None
+    try:
+        with open(fpath) as f:
+            meta = json.load(f)
+    except Exception as e:
+        print(e)
+    return meta
+
+def set_seeds(seed):
+    tf.random.set_seed(seed)
+    np.random.seed(seed)
+
+def load_data(fpath, tags):
+    df = pd.read_csv(fpath)
+    values = df[tags].values
+    labels = df[br_key].values
+    timestamps = df[ts_key].values
     return values, labels, timestamps, tags.copy()
 
 def pad_data(X, x_features, features, delay_classes, dc_comb):
@@ -86,6 +92,12 @@ def attention_block(x, nh):
     h = tf.keras.layers.Multiply()([a, v])
     return h
 
+def lstm(hidden, nhidden=640):
+    hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
+    hidden = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden)
+    hidden = tf.keras.layers.LSTM(nhidden)(hidden)
+    return hidden
+
 class Attention(tf.keras.layers.Layer):
 
     def __init__(self,**kwargs):
@@ -109,16 +121,14 @@ class Attention(tf.keras.layers.Layer):
     def get_config(self):
         return super(Attention, self).get_config()
 
-def att(hidden, nhidden=640):
-    #hidden = attention_block(hidden, attention_size)
+def lstmatt(hidden, nhidden=640):
     hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
     hidden = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden)
     hidden = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden)
     hidden = Attention()(hidden)
-    #hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
-def rnn(hidden, nhidden=640):
+def bilstm(hidden, nhidden=640):
     hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
     hidden = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(nhidden, activation='relu', return_sequences=False))(hidden)
     hidden = tf.keras.layers.Flatten()(hidden)
@@ -141,14 +151,23 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train classifiers')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-e', '--extractor', help='feature extractor', default='mlp', choices=['mlp', 'cnn', 'att', 'rnn'])
+    parser.add_argument('-e', '--extractor', help='feature extractor', default='mlp', choices=['mlp', 'cnn', 'lstm', 'lstmatt', 'bilstm'])
     parser.add_argument('-d', '--delay', help='Delay class when prediction starts', default='1')
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
     parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
     parser.add_argument('-y', '--ylimits', help='Use bleach ratio limits from data?', default=False, type=bool)
     parser.add_argument('-r', '--retrain', help='Retrain model?', default=False, type=bool)
+    parser.add_argument('-n', '--ntests', help='Number of tests', type=int, default=1)
+    parser.add_argument('-m', '--mode', help='Mode', default='development', choices=['development', 'production'])
     args = parser.parse_args()
+
+    # number of tests
+
+    if args.mode == 'production':
+        ntests = 1
+    else:
+        ntests = args.ntests
 
     # cuda
 
@@ -159,9 +178,10 @@ if __name__ == '__main__':
 
     set_seeds(seed)
 
-    # tags and standardization values
+    # load meta
 
-    meta = load_meta(processed_data_dir, args.task)
+    task_dir = osp.join(data_dir, args.task)
+    meta = load_meta(osp.join(task_dir, meta_fname))
     features = meta['features']
     classes = meta['classes']
     nfeatures = []
@@ -171,15 +191,6 @@ if __name__ == '__main__':
         dcs.extend(str(uc))
         nfeatures.append(len([c for c in classes if c == uc]))
         tbl_dc_combs.append(','.join([item for item in dcs]))
-    xmin = np.array(meta['xmin'])
-    xmax = np.array(meta['xmax'])
-
-    if args.ylimits:
-        ymin = meta['ymin']
-        ymax = meta['ymax']
-    else:
-        ymin = br_min
-        ymax = br_max
 
     # delay classes combination
 
@@ -192,75 +203,26 @@ if __name__ == '__main__':
 
     # load data
 
-    vals, labels, timestamps, val_features = load_data(processed_data_dir, args.task, features)
-
-    # create datasets by padding certain feature classes
-
-    Xtv, Ytv = {}, {}
-
-    for stage in stages[:-1]:
-        Xtv[stage] = []
-        Ytv[stage] = []
-        for dc_comb in dc_combs:
-            Xtv[stage].append(pad_data(vals[stage], val_features, features, classes, dc_comb))
-            Ytv[stage].append(labels[stage])
-        Xtv[stage] = np.vstack(Xtv[stage])
-        Ytv[stage] = np.hstack(Ytv[stage])
-
-    stage = stages[-1]
-    Xi = {}
-    for dc_comb in dc_combs:
-        Xi[dc_comb] = pad_data(vals[stage], val_features, features, classes, dc_comb)
-    Yi = labels[stage]
-    Ti = timestamps[stage]
-
-    # create output directories
-
-    task_models_dir = osp.join(models_dir, args.task)
-    task_results_dir = osp.join(results_dir, args.task)
-    for d in [models_dir, task_models_dir, results_dir, task_results_dir]:
-        if not osp.isdir(d):
-            os.mkdir(d)
+    values, labels, timestamps, val_features = load_data(osp.join(task_dir, features_fname), features)
 
     # model name
 
     model_name = f'{args.extractor}_{args.delay}'
 
-    # results tables
+    # create output directories
 
-    e_path = osp.join(task_results_dir, prediction_errors_csv)
-    r_path = osp.join(task_results_dir, prediction_results_csv)
-
-    try:
-        pe = pd.read_csv(e_path)
-    except:
-        pe = pd.DataFrame({
-            'Delay classes': [comb for comb in tbl_dc_combs]
-        })
-    if model_name not in pe.keys():
-        pe[model_name] = [np.nan for comb in tbl_dc_combs]
-
-    try:
-        pr = pd.read_csv(r_path)
-    except:
-        pr = pd.DataFrame({
-            ts_key: [value for value in Ti],
-            br_key: [value for value in Yi],
-        })
-    for dc_comb in tbl_dc_combs:
-        model_comb = f'{model_name}_{dc_comb}'
-        if model_comb not in pr.keys():
-            pr[model_comb] = [np.nan for _ in Yi]
-
-    # create model and results directories
-
-    m_path = osp.join(task_models_dir, model_name)
-    if not osp.isdir(m_path):
-        os.mkdir(m_path)
+    task_models_dir = osp.join(models_dir, args.task)
+    model_mode_dir = osp.join(task_models_dir, args.mode)
+    m_path = osp.join(task_models_dir, args.mode, model_name)
+    task_results_dir = osp.join(results_dir, args.task)
+    results_mode_dir = osp.join(task_results_dir, args.mode)
+    for d in [models_dir, task_models_dir, model_mode_dir, m_path, results_dir, task_results_dir, results_mode_dir]:
+        if not osp.isdir(d):
+            os.mkdir(d)
 
     # load model
 
-    if not args.retrain:
+    if args.mode == 'production' and not args.retrain:
         try:
             model = tf.keras.models.load_model(m_path)
             have_to_create_model = False
@@ -271,58 +233,137 @@ if __name__ == '__main__':
     else:
         have_to_create_model = True
 
-    # create a new model if needed
+    # prediction results
 
-    if have_to_create_model:
+    errors = np.zeros(ntests)
+    for k in range(ntests):
+        print(f'Test {k + 1}/{ntests}:')
 
-        print(f'Training new model {model_name}:')
-        inputs, hidden = model_input(nfeatures, xmin, xmax)
-        extractor_type = locals()[args.extractor]
-        hidden = extractor_type(hidden)
-        model = model_output(inputs, hidden, ymin, ymax)
-        model_summary_lines = []
-        model.summary(print_fn=lambda x: model_summary_lines.append(x))
-        model_summary = "\n".join(model_summary_lines)
-        if args.verbose:
-            print(model_summary)
+        # data split
 
-        # train model
+        inds = np.arange(len(labels))
+        inds_splitted = [[] for _ in stages]
+        np.random.shuffle(inds)
+        val, remaining = np.split(inds, [int(validation_share * len(inds))])
+        if args.mode == 'production':
+            tr = remaining
+            te = np.array([], dtype=int)
+        else:
+            tr, te = np.split(remaining, [int(train_test_ratio * len(remaining))])
+        inds_splitted[0] = tr
+        inds_splitted[1] = val
+        inds_splitted[2] = te
+        timestamps_k, values_k, labels_k = {}, {}, {}
+        for fi, stage in enumerate(stages):
+            timestamps_k[stage], values_k[stage], labels_k[stage] = timestamps[inds_splitted[fi]], values[inds_splitted[fi], :], labels[inds_splitted[fi]]
 
-        model.fit(
-            Xtv[stages[0]], Ytv[stages[0]],
-            validation_data=(Xtv[stages[1]], Ytv[stages[1]]),
-            epochs=epochs,
-            verbose=args.verbose,
-            batch_size=batch_size,
-            callbacks=[tf.keras.callbacks.EarlyStopping(
-                monitor='val_loss',
-                verbose=False,
-                patience=patience,
-                mode='min',
-                restore_best_weights=True
-            )]
-        )
+        # standardization coefficients
 
-        # save model
+        xmin = np.nanmin(values_k[stages[0]], axis=0)
+        xmax = np.nanmax(values_k[stages[0]], axis=0)
+        if args.ylimits:
+            ymin = np.nanmin(labels_k[stages[0]])
+            ymax = np.nanmax(labels_k[stages[0]])
+        else:
+            ymin = br_min
+            ymax = br_max
 
-        model.save(m_path)
-        with open(osp.join(m_path, summary_txt), 'w') as f:
-            f.write(model_summary)
+        # create datasets by padding certain feature classes
 
-    # calculate prediction error for each class combination
+        Xtv, Ytv = {}, {}
 
-    for dc_comb in dc_combs:
-        predictions = model.predict(Xi[dc_comb]).flatten()
-        assert len(predictions) == len(Yi)
-        error = np.mean(np.abs(Yi - predictions))
-        print(f'Prediction error for combination {dc_comb}: {error}')
+        for stage in stages[:-1]:
+            Xtv[stage] = []
+            Ytv[stage] = []
+            for dc_comb in dc_combs:
+                Xtv[stage].append(pad_data(values_k[stage], val_features, features, classes, dc_comb))
+                Ytv[stage].append(labels_k[stage])
+            Xtv[stage] = np.vstack(Xtv[stage])
+            Ytv[stage] = np.hstack(Ytv[stage])
 
-        # save results
+        if args.mode == 'production':
+            stage = stages[1]
+        else:
+            stage = stages[2]
+        Xi = {}
+        for dc_comb in dc_combs:
+            Xi[dc_comb] = pad_data(values_k[stage], val_features, features, classes, dc_comb)
+        Yi = labels_k[stage]
+        Ti = timestamps_k[stage]
 
-        assert dc_comb in tbl_dc_combs
-        idx = tbl_dc_combs.index(dc_comb)
-        pe[model_name].values[idx] = error
-        pe.to_csv(e_path, index=None)
-        model_comb = f'{model_name}_{dc_comb}'
-        pr[model_comb].values[:] = predictions
-        pr.to_csv(r_path, index=None)
+        # create and train a new model if needed
+
+        if have_to_create_model:
+
+            print(f'Training new model {model_name}:')
+            inputs, hidden = model_input(nfeatures, xmin, xmax)
+            extractor_type = locals()[args.extractor]
+            hidden = extractor_type(hidden)
+            model = model_output(inputs, hidden, ymin, ymax)
+            model_summary_lines = []
+            model.summary(print_fn=lambda x: model_summary_lines.append(x))
+            model_summary = "\n".join(model_summary_lines)
+            if args.verbose and k == 0:
+                print(model_summary)
+
+            model.fit(
+                Xtv[stages[0]], Ytv[stages[0]],
+                validation_data=(Xtv[stages[1]], Ytv[stages[1]]),
+                epochs=epochs,
+                verbose=args.verbose,
+                batch_size=batch_size,
+                callbacks=[tf.keras.callbacks.EarlyStopping(
+                    monitor='val_loss',
+                    verbose=False,
+                    patience=patience,
+                    mode='min',
+                    restore_best_weights=True
+                )]
+            )
+
+            # save model
+
+            model.save(m_path)
+            with open(osp.join(m_path, summary_txt), 'w') as f:
+                f.write(model_summary)
+
+        # results tables
+
+        e_path = osp.join(results_mode_dir, prediction_errors_fname)
+        r_path = osp.join(results_mode_dir, prediction_results_fname)
+
+        try:
+            pe = pd.read_csv(e_path)
+        except:
+            pe = pd.DataFrame({
+                'Delay classes': [comb for comb in tbl_dc_combs]
+            })
+
+        if model_name not in pe.keys():
+            pe[model_name] = [np.nan for comb in tbl_dc_combs]
+
+        try:
+            pr = pd.read_csv(r_path)
+        except:
+            pr = pd.DataFrame({
+                ts_key: [value for value in Ti],
+                br_key: [value for value in Yi],
+            })
+
+        # calculate prediction error for each class combination
+
+        for dc_comb in dc_combs:
+            predictions = model.predict(Xi[dc_comb]).flatten()
+            assert len(predictions) == len(Yi)
+            errors[k] = np.mean(np.abs(Yi - predictions))
+            print(f'Prediction error for combination {dc_comb}: {errors[k]}')
+
+            # save results
+
+            assert dc_comb in tbl_dc_combs
+            idx = tbl_dc_combs.index(dc_comb)
+            pe[model_name].values[idx] = np.mean(errors[:k+1])
+            pe.to_csv(e_path, index=None)
+            model_comb = f'{model_name}_{dc_comb}'
+            pr[model_comb] = predictions
+            pr.to_csv(r_path, index=None)

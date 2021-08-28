@@ -96,46 +96,26 @@ if __name__ == '__main__':
     delay_classes = [delay_classes[i] for i in feature_indexes_sorted]
     values = values[:, feature_indexes_sorted]
 
-    # set seed for results reproduction
-
-    np.random.seed(seed)
-
-    # train, test, validation split
-
-    inds = np.arange(len(labels))
-    inds_splitted = [[] for _ in stages]
-    np.random.shuffle(inds)
-    val, remaining = np.split(inds, [int(validation_share * len(inds))])
-    tr, te = np.split(remaining, [int(train_test_ratio * len(remaining))])
-    inds_splitted[0] = tr
-    inds_splitted[1] = val
-    inds_splitted[2] = te
-
     # meta
 
     meta = {'features': features, 'classes': delay_classes, 'label': br_key}
 
     # output directory
 
-    if not osp.isdir(processed_data_dir):
-        os.mkdir(processed_data_dir)
+    task_dir = osp.join(data_dir, args.task)
+    if not osp.isdir(task_dir):
+        os.mkdir(task_dir)
 
     # save datasets
 
-    for fi, stage in enumerate(stages):
-        fname = f'{args.task}_{stage}{csv}'
-        fpath = osp.join(processed_data_dir, fname)
-        data = np.hstack([timestamps[inds_splitted[fi], None], values[inds_splitted[fi], :], labels[inds_splitted[fi], None]])
-        print(f'Number of samples for {stage}: {data.shape[0]}')
-        pd.DataFrame(data, columns=[ts_key] + features + [br_key]).to_csv(fpath, mode='w', index=False)
-        if stage == 'training':
-            meta['xmin'] = np.nanmin(values[inds_splitted[fi], :], axis=0).tolist()
-            meta['xmax'] = np.nanmax(values[inds_splitted[fi], :], axis=0).tolist()
-            meta['ymin'] = np.nanmin(labels[inds_splitted[fi]])
-            meta['ymax'] = np.nanmax(labels[inds_splitted[fi]])
+    fname = features_fname
+    fpath = osp.join(task_dir, fname)
+    data = np.hstack([timestamps[:, None], values, labels[:, None]])
+    print(f'Number of samples: {data.shape[0]}')
+    pd.DataFrame(data, columns=[ts_key] + features + [br_key]).to_csv(fpath, mode='w', index=False)
 
     # save meta
 
-    meta_fpath = osp.join(processed_data_dir, f'{args.task}_metainfo.json')
+    meta_fpath = osp.join(task_dir, meta_fname)
     with open(meta_fpath, 'w') as jf:
         json.dump(meta, jf)
