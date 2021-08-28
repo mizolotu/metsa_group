@@ -121,7 +121,7 @@ class Attention(tf.keras.layers.Layer):
     def get_config(self):
         return super(Attention, self).get_config()
 
-def lstmatt(hidden, nhidden=640):
+def lstm_att(hidden, nhidden=640):
     hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
     hidden = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden)
     hidden = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden)
@@ -131,6 +131,13 @@ def lstmatt(hidden, nhidden=640):
 def bilstm(hidden, nhidden=640):
     hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
     hidden = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(nhidden, activation='relu', return_sequences=False))(hidden)
+    hidden = tf.keras.layers.Flatten()(hidden)
+    return hidden
+
+def bilstm_att(hidden, nhidden=640):
+    hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
+    hidden = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(nhidden, activation='relu', return_sequences=True))(hidden)
+    hidden = Attention()(hidden)
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
@@ -151,7 +158,7 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train classifiers')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-e', '--extractor', help='feature extractor', default='mlp', choices=['mlp', 'cnn', 'lstm', 'lstmatt', 'bilstm'])
+    parser.add_argument('-e', '--extractor', help='feature extractor', default='mlp', choices=['mlp', 'cnn', 'lstm', 'lstm_att', 'bilstm', 'bilstm_att'])
     parser.add_argument('-d', '--delay', help='Delay class when prediction starts', default='1')
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
