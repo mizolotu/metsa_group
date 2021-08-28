@@ -159,7 +159,8 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Train classifiers')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-e', '--extractor', help='feature extractor', default='mlp', choices=['mlp', 'cnn', 'lstm', 'lstm_att', 'bilstm', 'bilstm_att'])
-    parser.add_argument('-d', '--delay', help='Delay class when prediction starts', default='1')
+    parser.add_argument('-f', '--firstclass', help='Delay class when prediction starts', type=int, default=1)
+    parser.add_argument('-l', '--lastclass', help='Delay class when prediction ends', type=int, default=5)
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
     parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
@@ -191,30 +192,37 @@ if __name__ == '__main__':
     meta = load_meta(osp.join(task_dir, meta_fname))
     features = meta['features']
     classes = meta['classes']
+    uclasses = np.sort(np.unique(classes))
+    features_selected, feature_classes_selected = [list(item) for item in zip(*[(f, c) for f, c in zip(features, classes) if c <= args.lastclass])]
+    u_feature_classes_selected = np.unique(feature_classes_selected)
+    u_classes_selected = [c for c in feature_classes_selected if c >= args.firstclass]
     nfeatures = []
     dcs = []
+    dc_combs = []
     tbl_dc_combs = []
-    for uc in np.sort(np.unique(classes)):
+    for uc in uclasses:
         dcs.extend(str(uc))
-        nfeatures.append(len([c for c in classes if c == uc]))
-        tbl_dc_combs.append(','.join([item for item in dcs]))
-
-    # delay classes combination
-
-    if args.delay is not None:
-        dc_combs = [dc for dc in tbl_dc_combs if args.delay in dc]
-    else:
-        dc_combs = tbl_dc_combs
+        dc_comb = ','.join([item for item in dcs])
+        tbl_dc_combs.append(dc_comb)
+        nf = len([c for c in classes if c == uc])
+        if uc in u_feature_classes_selected:
+            nfeatures.append(nf)
+            if uc in u_classes_selected:
+                dc_combs.append(dc_comb)
 
     print(f'The following feature classes will be used to train the model: {dc_combs}')
 
     # load data
 
-    values, labels, timestamps, val_features = load_data(osp.join(task_dir, features_fname), features)
+    values, labels, timestamps, val_features = load_data(osp.join(task_dir, features_fname), features_selected)
+    print(values.shape)
 
     # model name
 
-    model_name = f'{args.extractor}_{args.delay}'
+    if args.firstclass == args.lastclass:
+        model_name = f'{args.extractor}_{args.firstclass}'
+    else:
+        model_name = f'{args.extractor}_{args.firstclass}_{args.lastclass}'
 
     # create output directories
 
@@ -266,8 +274,8 @@ if __name__ == '__main__':
 
         # standardization coefficients
 
-        xmin = np.nanmin(values_k[stages[0]], axis=0)
-        xmax = np.nanmax(values_k[stages[0]], axis=0)
+        xmin = np.nanmin(values_k[stages[0]], axis=0)[:np.sum(nfeatures)]
+        xmax = np.nanmax(values_k[stages[0]], axis=0)[:np.sum(nfeatures)]
         if args.ylimits:
             ymin = np.nanmin(labels_k[stages[0]])
             ymax = np.nanmax(labels_k[stages[0]])
