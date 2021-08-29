@@ -262,7 +262,7 @@ if __name__ == '__main__':
 
         # load model
 
-        if args.mode == 'production' and not args.retrain:
+        if not args.retrain:
             try:
                 model = tf.keras.models.load_model(m_path)
                 have_to_create_model = False
