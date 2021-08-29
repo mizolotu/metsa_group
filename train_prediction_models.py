@@ -67,7 +67,7 @@ def model_input(nfeatures, xmin, xmax, batchnorm=False):
 def baseline(hidden, latent_dim=None):
     return hidden
 
-def split(hidden, latent_dim=64):
+def split(hidden, latent_dim=256):
     hidden_spl = tf.split(hidden, nfeatures, axis=1)
     hidden = []
     for spl in hidden_spl:
@@ -177,7 +177,7 @@ if __name__ == '__main__':
 
     # model input layer
 
-    if args.input is None:
+    if args.input is None or args.input == 0:
         input_layer = 'baseline'
         feature_extractor = 'mlp'
         print('No latent size has been provided, mlp feature extractor will be used')
@@ -240,10 +240,9 @@ if __name__ == '__main__':
 
     # model name
 
-    if args.firstclass == lastclass:
-        model_name = f'{input_layer}_{feature_extractor}_{args.firstclass}'
-    else:
-        model_name = f'{input_layer}_{feature_extractor}_{args.firstclass}_{lastclass}'
+    model_name = f'{input_layer}_{feature_extractor}_{args.firstclass}'
+    if args.firstclass != lastclass:
+        model_name = '-'.join([model_name, lastclass])
 
     # create output directories
 
