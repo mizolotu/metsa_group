@@ -175,11 +175,6 @@ if __name__ == '__main__':
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=['development', 'production'])
     args = parser.parse_args()
 
-    # tf logging level
-
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-
     # model input layer
 
     if args.input is None or args.input == 0:
