@@ -64,7 +64,8 @@ def model_input(nfeatures, xmin, xmax, batchnorm=False):
 
     return inputs, hidden
 
-def baseline(hidden, latent_dim=None):
+def baseline(hidden, latent_dim=256):
+    hidden = tf.keras.layers.Dense(latent_dim, activation='relu')(hidden)
     return hidden
 
 def split(hidden, latent_dim=256):
