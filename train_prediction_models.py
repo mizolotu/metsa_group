@@ -80,9 +80,10 @@ def mlp(hidden, nhidden=2048):
     hidden = tf.keras.layers.Dense(nhidden, activation='relu')(hidden)
     return hidden
 
-def cnn(hidden, nfilters=1024, kernel_size=3):
-    hidden = tf.keras.layers.Conv1D(nfilters, kernel_size, activation='relu')(hidden)
-    hidden = tf.keras.layers.Conv1D(nfilters, kernel_size, activation='relu')(hidden)
+def cnn(hidden, nfilters=1024, kernel_size=2):
+    last_conv_kernel_size = hidden.shape[1]
+    hidden = tf.keras.layers.Conv1D(nfilters, kernel_size, padding='same', activation='relu')(hidden)
+    hidden = tf.keras.layers.Conv1D(nfilters, last_conv_kernel_size, activation='relu')(hidden)
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
@@ -163,8 +164,8 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-i', '--input', help='Model input', default='baseline', choices=['baseline', 'split'])
     parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn', 'lstm', 'bilstm'])
-    parser.add_argument('-f', '--firstclass', help='Delay class when prediction starts', type=int, default=1)
-    parser.add_argument('-l', '--lastclass', help='Delay class when prediction ends', type=int, default=5)
+    parser.add_argument('-f', '--firstclass', help='Delay class when prediction starts', type=int, default=5)
+    parser.add_argument('-l', '--lastclass', help='Delay class when prediction ends', type=int)
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
     parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
@@ -173,6 +174,13 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--ntests', help='Number of tests', type=int, default=1)
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=['development', 'production'])
     args = parser.parse_args()
+
+    # last class
+
+    if args.lastclass is None:
+        lastclass = args.firstclass
+    else:
+        lastclass = args.lastclass
 
     # number of tests
 
@@ -197,7 +205,7 @@ if __name__ == '__main__':
     features = meta['features']
     classes = meta['classes']
     uclasses = np.sort(np.unique(classes))
-    features_selected, feature_classes_selected = [list(item) for item in zip(*[(f, c) for f, c in zip(features, classes) if c <= args.lastclass])]
+    features_selected, feature_classes_selected = [list(item) for item in zip(*[(f, c) for f, c in zip(features, classes) if c <= lastclass])]
     u_feature_classes_selected = np.unique(feature_classes_selected)
     u_classes_selected = [c for c in feature_classes_selected if c >= args.firstclass]
     nfeatures = []
@@ -228,10 +236,10 @@ if __name__ == '__main__':
     else:
         extractor = args.extractor
 
-    if args.firstclass == args.lastclass:
+    if args.firstclass == lastclass:
         model_name = f'{args.input}_{extractor}_{args.firstclass}'
     else:
-        model_name = f'{args.input}_{extractor}_{args.firstclass}_{args.lastclass}'
+        model_name = f'{args.input}_{extractor}_{args.firstclass}_{lastclass}'
 
     # create output directories
 
