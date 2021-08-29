@@ -89,8 +89,8 @@ def cnn(hidden, nfilters=1024, kernel_size=2):
     return hidden
 
 def attention_block(x, nh):
-    q = tf.keras.layers.Dense(nh)(x)
-    v = tf.keras.layers.Dense(nh)(x)
+    q = tf.keras.layers.Dense(nh, activation='relu')(x)
+    v = tf.keras.layers.Dense(nh, activation='relu')(x)
     a = tf.keras.layers.Dense(1)(tf.nn.tanh(q + v))
     a = tf.keras.layers.Softmax(axis=1)(a)
     h = tf.keras.layers.Multiply()([a, v])
