@@ -64,7 +64,7 @@ def model_input(nfeatures, xmin, xmax, batchnorm=False):
 
     return inputs, hidden
 
-def baseline(hidden):
+def baseline(hidden, latent_dim=None):
     return hidden
 
 def split(hidden, latent_dim=64):
@@ -162,7 +162,7 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train prediction models')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-i', '--input', help='Model input', default='baseline', choices=['baseline', 'split'])
+    parser.add_argument('-i', '--input', help='Model input latent size', type=int)
     parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn', 'lstm', 'bilstm'])
     parser.add_argument('-f', '--firstclass', help='Delay class when prediction starts', type=int, default=5)
     parser.add_argument('-l', '--lastclass', help='Delay class when prediction ends', type=int)
@@ -174,6 +174,16 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--ntests', help='Number of tests', type=int, default=1)
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=['development', 'production'])
     args = parser.parse_args()
+
+    # model input layer
+
+    if args.input is None:
+        input_layer = 'baseline'
+        feature_extractor = 'mlp'
+        print('No latent size has been provided, mlp feature extractor will be used')
+    else:
+        input_layer = 'split'
+        feature_extractor = args.extractor
 
     # last class
 
@@ -230,16 +240,10 @@ if __name__ == '__main__':
 
     # model name
 
-    if args.input == 'baseline':
-        extractor = 'mlp'
-        print('Baseline input is only compatible with mlp feature extractor')
-    else:
-        extractor = args.extractor
-
     if args.firstclass == lastclass:
-        model_name = f'{args.input}_{extractor}_{args.firstclass}'
+        model_name = f'{input_layer}_{feature_extractor}_{args.firstclass}'
     else:
-        model_name = f'{args.input}_{extractor}_{args.firstclass}_{lastclass}'
+        model_name = f'{input_layer}_{feature_extractor}_{args.firstclass}_{lastclass}'
 
     # create output directories
 
@@ -330,9 +334,9 @@ if __name__ == '__main__':
             print(f'Training new model {model_name}:')
 
             inputs, hidden = model_input(nfeatures, xmin, xmax)
-            input_type = locals()[args.input]
-            hidden = input_type(hidden)
-            extractor_type = locals()[extractor]
+            input_type = locals()[input_layer]
+            hidden = input_type(hidden, args.input)
+            extractor_type = locals()[feature_extractor]
             hidden = extractor_type(hidden)
             model = model_output(inputs, hidden, ymin, ymax)
             model_summary_lines = []
