@@ -168,7 +168,7 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--firstclasses', help='Delay class when prediction starts', type=int, nargs='+', default=[1, 2, 3, 4, 5])
     parser.add_argument('-l', '--lastclasses', help='Delay class when prediction ends', type=int)
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
-    parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
+    parser.add_argument('-g', '--gpu', help='GPU to use')
     parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
     parser.add_argument('-y', '--ylimits', help='Use bleach ratio limits from data?', default=False, type=bool)
     parser.add_argument('-r', '--retrain', help='Retrain model?', default=False, type=bool)
@@ -201,8 +201,10 @@ if __name__ == '__main__':
 
     # cuda
 
-    if not args.cuda:
+    if args.gpu is None:
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+    else:
+        os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
     # set seed for results reproduction
 
