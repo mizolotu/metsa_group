@@ -39,7 +39,7 @@ def pad_data(X, x_features, features, delay_classes, dc_comb):
     X_padded[:, nan_cols] = np.nan
     return X_padded
 
-def model_input(nfeatures, xmin, xmax, latent_dim=64, batchnorm=False):
+def model_input(nfeatures, xmin, xmax, batchnorm=False):
 
     # input layer
 
@@ -62,15 +62,18 @@ def model_input(nfeatures, xmin, xmax, latent_dim=64, batchnorm=False):
     else:
         hidden = inputs_std
 
-    # split, stack and flatten
+    return inputs, hidden
 
+def baseline(hidden):
+    return hidden
+
+def split(hidden, latent_dim=64):
     hidden_spl = tf.split(hidden, nfeatures, axis=1)
     hidden = []
     for spl in hidden_spl:
         hidden.append(tf.keras.layers.Dense(latent_dim, activation='relu')(spl))
     hidden = tf.stack(hidden, axis=1)
-
-    return inputs, hidden
+    return hidden
 
 def mlp(hidden, nhidden=2048):
     hidden = tf.keras.layers.Flatten()(hidden)
@@ -96,6 +99,12 @@ def lstm(hidden, nhidden=640):
     hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
     hidden = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden)
     hidden = tf.keras.layers.LSTM(nhidden)(hidden)
+    return hidden
+
+def bilstm(hidden, nhidden=640):
+    hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
+    hidden = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(nhidden, activation='relu', return_sequences=False))(hidden)
+    hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
 class Attention(tf.keras.layers.Layer):
@@ -128,12 +137,6 @@ def lstm_att(hidden, nhidden=640):
     hidden = Attention()(hidden)
     return hidden
 
-def bilstm(hidden, nhidden=640):
-    hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
-    hidden = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(nhidden, activation='relu', return_sequences=False))(hidden)
-    hidden = tf.keras.layers.Flatten()(hidden)
-    return hidden
-
 def bilstm_att(hidden, nhidden=640):
     hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
     hidden = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(nhidden, activation='relu', return_sequences=True))(hidden)
@@ -156,9 +159,10 @@ if __name__ == '__main__':
 
     # args
 
-    parser = arp.ArgumentParser(description='Train classifiers')
+    parser = arp.ArgumentParser(description='Train prediction models')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-e', '--extractor', help='feature extractor', default='mlp', choices=['mlp', 'cnn', 'lstm', 'lstm_att', 'bilstm', 'bilstm_att'])
+    parser.add_argument('-i', '--input', help='Model input', default='baseline', choices=['baseline', 'split'])
+    parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn', 'lstm', 'bilstm'])
     parser.add_argument('-f', '--firstclass', help='Delay class when prediction starts', type=int, default=1)
     parser.add_argument('-l', '--lastclass', help='Delay class when prediction ends', type=int, default=5)
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
@@ -215,14 +219,19 @@ if __name__ == '__main__':
     # load data
 
     values, labels, timestamps, val_features = load_data(osp.join(task_dir, features_fname), features_selected)
-    print(values.shape)
 
     # model name
 
-    if args.firstclass == args.lastclass:
-        model_name = f'{args.extractor}_{args.firstclass}'
+    if args.input == 'baseline':
+        extractor = 'mlp'
+        print('Baseline input is only compatible with mlp feature extractor')
     else:
-        model_name = f'{args.extractor}_{args.firstclass}_{args.lastclass}'
+        extractor = args.extractor
+
+    if args.firstclass == args.lastclass:
+        model_name = f'{args.input}_{extractor}_{args.firstclass}'
+    else:
+        model_name = f'{args.input}_{extractor}_{args.firstclass}_{args.lastclass}'
 
     # create output directories
 
@@ -311,8 +320,11 @@ if __name__ == '__main__':
         if have_to_create_model:
 
             print(f'Training new model {model_name}:')
+
             inputs, hidden = model_input(nfeatures, xmin, xmax)
-            extractor_type = locals()[args.extractor]
+            input_type = locals()[args.input]
+            hidden = input_type(hidden)
+            extractor_type = locals()[extractor]
             hidden = extractor_type(hidden)
             model = model_output(inputs, hidden, ymin, ymax)
             model_summary_lines = []
