@@ -163,7 +163,7 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train prediction models')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-i', '--input', help='Model input latent size', type=int, default=256)
+    parser.add_argument('-i', '--input', help='Model input latent size', default='split', choices=['baseline', 'split'])
     parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn', 'lstm', 'bilstm'])
     parser.add_argument('-f', '--firstclasses', help='Delay class when prediction starts', type=int, nargs='+', default=[1, 2, 3, 4, 5])
     parser.add_argument('-l', '--lastclasses', help='Delay class when prediction ends', type=int)
@@ -178,12 +178,10 @@ if __name__ == '__main__':
 
     # model input layer
 
-    if args.input is None or args.input == 0:
-        input_layer = 'baseline'
+    if args.input is 'baseline':
         feature_extractor = 'mlp'
-        print('No latent size has been provided, mlp feature extractor will be used')
+        print('Baseline model will use mlp feature extractor')
     else:
-        input_layer = 'split'
         feature_extractor = args.extractor
 
     # last class
@@ -246,7 +244,7 @@ if __name__ == '__main__':
 
         # model name
 
-        model_name = f'{input_layer}_{feature_extractor}_{firstclass}'
+        model_name = f'{args.input}_{feature_extractor}_{firstclass}'
         if firstclass != lastclass:
             model_name = '-'.join([model_name, lastclass])
 
@@ -339,8 +337,8 @@ if __name__ == '__main__':
                 print(f'Training new model {model_name}:')
 
                 inputs, hidden = model_input(nfeatures, xmin, xmax)
-                input_type = locals()[input_layer]
-                hidden = input_type(hidden, args.input)
+                input_type = locals()[args.input]
+                hidden = input_type(hidden)
                 extractor_type = locals()[feature_extractor]
                 hidden = extractor_type(hidden)
                 model = model_output(inputs, hidden, ymin, ymax)
