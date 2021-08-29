@@ -89,13 +89,18 @@ def cnn(hidden, nfilters=1024, kernel_size=2):
     return hidden
 
 def attention_block(x, nh):
-    q = tf.keras.layers.Dense(nh, use_bias=False)(x)
-    k = tf.keras.layers.Dense(nh, use_bias=False)(x)
-    v = tf.keras.layers.Dense(nh, use_bias=False)(x)
-    a = tf.keras.layers.Multiply()([q, k])
-    a = tf.keras.layers.Softmax(axis=-1)(a)
+    q = tf.keras.layers.Dense(nh)(x)
+    v = tf.keras.layers.Dense(nh)(x)
+    a = tf.keras.layers.Dense(1)(tf.nn.tanh(q + v))
+    a = tf.keras.layers.Softmax(axis=1)(a)
     h = tf.keras.layers.Multiply()([a, v])
+    h = tf.reduce_sum(h, axis=1)
     return h
+
+def att(hidden, attention_size=2048):
+    hidden = attention_block(hidden, attention_size)
+    hidden = tf.keras.layers.Flatten()(hidden)
+    return hidden
 
 def lstm(hidden, nhidden=640):
     hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
@@ -164,7 +169,7 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Train prediction models')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-i', '--input', help='Model input latent size', default='split', choices=['baseline', 'split'])
-    parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn', 'lstm', 'bilstm'])
+    parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn', 'lstm', 'bilstm', 'att'])
     parser.add_argument('-f', '--firstclasses', help='Delay class when prediction starts', type=int, nargs='+', default=[1, 2, 3, 4, 5])
     parser.add_argument('-l', '--lastclasses', help='Delay class when prediction ends', type=int)
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
@@ -178,7 +183,7 @@ if __name__ == '__main__':
 
     # model input layer
 
-    if args.input is 'baseline':
+    if args.input == 'baseline':
         feature_extractor = 'mlp'
         print('Baseline model will use mlp feature extractor')
     else:
