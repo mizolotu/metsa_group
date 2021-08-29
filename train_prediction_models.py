@@ -97,11 +97,6 @@ def attention_block(x, nh):
     h = tf.reduce_sum(h, axis=1)
     return h
 
-def att(hidden, attention_size=2048):
-    hidden = attention_block(hidden, attention_size)
-    hidden = tf.keras.layers.Flatten()(hidden)
-    return hidden
-
 def lstm(hidden, nhidden=640):
     hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
     hidden = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden)
@@ -120,15 +115,23 @@ class Attention(tf.keras.layers.Layer):
         super(Attention, self).__init__(**kwargs)
 
     def build(self, input_shape):
-        self.W = self.add_weight(name="att_weight",shape=(input_shape[-1], 1),initializer="normal")
-        self.b = self.add_weight(name="att_bias",shape=(input_shape[1], 1),initializer="zeros")
+        self.W1 = self.add_weight(name="att_weight1",shape=(input_shape[-1], 1),initializer="normal")
+        self.b1 = self.add_weight(name="att_bias1",shape=(input_shape[1] // 2, 1),initializer="zeros")
+        self.W2 = self.add_weight(name="att_weight2", shape=(input_shape[-1], 1), initializer="normal")
+        self.b2 = self.add_weight(name="att_bias2", shape=(input_shape[1] // 2, 1), initializer="zeros")
         super(Attention, self).build(input_shape)
 
     def call(self, x):
-        et=tf.squeeze(tf.tanh(tf.tensordot(x, self.W, 1) + self.b), axis=-1)
-        at=tf.math.softmax(et)
-        at=tf.expand_dims(at, axis=-1)
-        output=x * at
+        x1, x2 = tf.split(x, num_or_size_splits=2, axis=1)
+        et1=tf.squeeze(tf.tanh(tf.tensordot(x1, self.W1, 1) + self.b1), axis=-1)
+        at1=tf.math.softmax(et1)
+        at1=tf.expand_dims(at1, axis=-1)
+        output1=x2 * at1
+        et2 = tf.squeeze(tf.tanh(tf.tensordot(x2, self.W2, 1) + self.b2), axis=-1)
+        at2 = tf.math.softmax(et2)
+        at2 = tf.expand_dims(at2, axis=-1)
+        output2 = x1 * at2
+        output = tf.concat([output1, output2], axis=1)
         return tf.math.reduce_sum(output, axis=1)
 
     def compute_output_shape(self, input_shape):
@@ -137,10 +140,12 @@ class Attention(tf.keras.layers.Layer):
     def get_config(self):
         return super(Attention, self).get_config()
 
-def lstm_att(hidden, nhidden=640):
-    hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
-    hidden = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden)
-    hidden = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden)
+def att(hidden, nhidden=640):
+    hidden1 = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
+    hidden1 = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden1)
+    hidden2 = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
+    hidden2 = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden2)
+    hidden = tf.concat([hidden1, hidden2], axis=1)
     hidden = Attention()(hidden)
     return hidden
 
