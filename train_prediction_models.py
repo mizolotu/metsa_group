@@ -43,8 +43,7 @@ def model_input(nfeatures, xmin, xmax, batchnorm=False):
 
     # input layer
 
-    nfeatures_sum = np.sum(nfeatures)
-    inputs = tf.keras.layers.Input(shape=(nfeatures_sum,))
+    inputs = tf.keras.layers.Input(shape=(nfeatures,))
 
     # deal with nans
 
@@ -64,11 +63,11 @@ def model_input(nfeatures, xmin, xmax, batchnorm=False):
 
     return inputs, hidden
 
-def baseline(hidden, latent_dim=256):
-    hidden = tf.keras.layers.Dense(latent_dim, activation='relu')(hidden)
+def baseline(hidden, nfeatures, latent_dim=256):
+    hidden = tf.keras.layers.Dense(latent_dim * nfeatures.shape[0], activation='relu')(hidden)
     return hidden
 
-def split(hidden, latent_dim=256):
+def split(hidden, nfeatures, latent_dim=256):
     hidden_spl = tf.split(hidden, nfeatures, axis=1)
     hidden = []
     for spl in hidden_spl:
@@ -348,9 +347,9 @@ if __name__ == '__main__':
 
                 print(f'Training new model {model_name}:')
 
-                inputs, hidden = model_input(nfeatures, xmin, xmax)
+                inputs, hidden = model_input(np.sum(nfeatures), xmin, xmax)
                 input_type = locals()[args.input]
-                hidden = input_type(hidden)
+                hidden = input_type(hidden, nfeatures)
                 extractor_type = locals()[feature_extractor]
                 hidden = extractor_type(hidden)
                 model = model_output(inputs, hidden, ymin, ymax)
