@@ -273,7 +273,7 @@ if __name__ == '__main__':
 
         # load model
 
-        if not args.retrain:
+        if ntests == 1 and not args.retrain:
             try:
                 model = tf.keras.models.load_model(m_path)
                 have_to_create_model = False
