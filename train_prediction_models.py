@@ -121,6 +121,13 @@ def bilstm(hidden, nhidden=640):
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
+def cnn1lstm(hidden, nfilters=[1280, 1280], kernel_size=2, nhidden=640):
+    for nf in nfilters:
+        hidden = tf.keras.layers.Conv1D(nf, kernel_size, padding='same', activation='relu')(hidden)
+    hidden = tf.keras.layers.LSTM(nhidden, activation='relu', return_sequences=False)(hidden)
+    hidden = tf.keras.layers.Flatten()(hidden)
+    return hidden
+
 class Attention(tf.keras.layers.Layer):
 
     def __init__(self,**kwargs):
@@ -185,7 +192,7 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Train prediction models')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-i', '--input', help='Model input latent size', default='split', choices=['baseline', 'split'])
-    parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn1', 'cnn2', 'lstm', 'bilstm', 'att'])
+    parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn1', 'cnn2', 'lstm', 'bilstm', 'cnn1lstm', 'att'])
     parser.add_argument('-f', '--firstclasses', help='Delay class when prediction starts', type=int, nargs='+', default=[1, 2, 3, 4, 5])
     parser.add_argument('-l', '--lastclasses', help='Delay class when prediction ends', type=int, nargs='+')
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
