@@ -176,7 +176,7 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--input', help='Model input latent size', default='split', choices=['baseline', 'split'])
     parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn', 'lstm', 'bilstm', 'att'])
     parser.add_argument('-f', '--firstclasses', help='Delay class when prediction starts', type=int, nargs='+', default=[1, 2, 3, 4, 5])
-    parser.add_argument('-l', '--lastclasses', help='Delay class when prediction ends', type=int)
+    parser.add_argument('-l', '--lastclasses', help='Delay class when prediction ends', type=int, nargs='+')
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-g', '--gpu', help='GPU to use')
     parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
