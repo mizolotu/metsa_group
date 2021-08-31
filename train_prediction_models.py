@@ -91,12 +91,12 @@ def cnn1(hidden, nhiddens=[1280, 1280], nfilters=1024, kernel_size=2):
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
-def cnn2(hidden, nfilters=256, kernel_size_row=2, kernel_size_col=64, stride_size=32):
-    last_conv_kernel_size = hidden.shape[1]
+def cnn2(hidden, nfilters=512, kernel_size_row=2, kernel_size_col=64, stride_size=32):
+    hshape = hidden.shape[1:]
     hidden = tf.expand_dims(hidden, -1)
-    hidden = tf.keras.layers.Conv2D(nfilters, kernel_size=(1, kernel_size_col), strides=(1, stride_size), activation='relu')(hidden)
-    hidden = tf.keras.layers.Conv2D(nfilters, kernel_size=(kernel_size_row, kernel_size_col), padding='same', activation='relu')(hidden)
-    hidden = tf.keras.layers.Conv2D(nfilters, kernel_size=(last_conv_kernel_size, 4), strides=(1, 2), activation='relu')(hidden)
+    hidden = tf.keras.layers.Conv2D(nfilters, kernel_size=(2, kernel_size_col), strides=(1, stride_size), padding='same', activation='relu')(hidden)
+    #hidden = tf.keras.layers.Conv2D(nfilters, kernel_size=(kernel_size_row, kernel_size_col), padding='same', activation='relu')(hidden)
+    hidden = tf.keras.layers.Conv2D(nfilters, kernel_size=(hshape[0], hshape[1] // stride_size - 1),  activation='relu')(hidden)
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
