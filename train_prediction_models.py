@@ -43,8 +43,7 @@ def model_input(nfeatures, xmin, xmax, batchnorm=False):
 
     # input layer
 
-    nfeatures_sum = np.sum(nfeatures)
-    inputs = tf.keras.layers.Input(shape=(nfeatures_sum,))
+    inputs = tf.keras.layers.Input(shape=(nfeatures,))
 
     # deal with nans
 
@@ -64,11 +63,11 @@ def model_input(nfeatures, xmin, xmax, batchnorm=False):
 
     return inputs, hidden
 
-def baseline(hidden, latent_dim=256):
-    hidden = tf.keras.layers.Dense(latent_dim, activation='relu')(hidden)
+def baseline(hidden, nfeatures, latent_dim=256):
+    hidden = tf.keras.layers.Dense(latent_dim * len(nfeatures), activation='relu')(hidden)
     return hidden
 
-def split(hidden, latent_dim=256):
+def split(hidden, nfeatures, latent_dim=256):
     hidden_spl = tf.split(hidden, nfeatures, axis=1)
     hidden = []
     for spl in hidden_spl:
@@ -76,15 +75,28 @@ def split(hidden, latent_dim=256):
     hidden = tf.stack(hidden, axis=1)
     return hidden
 
-def mlp(hidden, nhidden=2048):
+def mlp(hidden, nhiddens=[2048, 2048], dropout=0.5):
     hidden = tf.keras.layers.Flatten()(hidden)
-    hidden = tf.keras.layers.Dense(nhidden, activation='relu')(hidden)
+    for nhidden in nhiddens:
+        hidden = tf.keras.layers.Dense(nhidden, activation='relu')(hidden)
+        if dropout is not None:
+            hidden = tf.keras.layers.Dropout(dropout)(hidden)
     return hidden
 
-def cnn(hidden, nfilters=1024, kernel_size=2):
+def cnn1(hidden, nhiddens=[1280, 1280], nfilters=1024, kernel_size=2):
     last_conv_kernel_size = hidden.shape[1]
-    hidden = tf.keras.layers.Conv1D(nfilters, kernel_size, padding='same', activation='relu')(hidden)
+    for nhidden in nhiddens:
+        hidden = tf.keras.layers.Conv1D(nhidden, kernel_size, padding='same', activation='relu')(hidden)
     hidden = tf.keras.layers.Conv1D(nfilters, last_conv_kernel_size, activation='relu')(hidden)
+    hidden = tf.keras.layers.Flatten()(hidden)
+    return hidden
+
+def cnn2(hidden, nfilters=256, kernel_size_row=2, kernel_size_col=64, stride_size=32):
+    last_conv_kernel_size = hidden.shape[1]
+    hidden = tf.expand_dims(hidden, -1)
+    hidden = tf.keras.layers.Conv2D(nfilters, kernel_size=(1, kernel_size_col), strides=(1, stride_size), activation='relu')(hidden)
+    hidden = tf.keras.layers.Conv2D(nfilters, kernel_size=(kernel_size_row, kernel_size_col), padding='same', activation='relu')(hidden)
+    hidden = tf.keras.layers.Conv2D(nfilters, kernel_size=(last_conv_kernel_size, 4), strides=(1, 2), activation='relu')(hidden)
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
@@ -156,11 +168,10 @@ def bilstm_att(hidden, nhidden=640):
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
-def model_output(inputs, hidden, ymin, ymax, layers=[2048, 2048], dropout=0.5, lr=2.5e-4):
-    for nh in layers:
-        hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
-        if dropout is not None:
-            hidden = tf.keras.layers.Dropout(dropout)(hidden)
+def model_output(inputs, hidden, ymin, ymax, nhidden=2048, dropout=0.5, lr=2.5e-4):
+    hidden = tf.keras.layers.Dense(nhidden, activation='relu')(hidden)
+    if dropout is not None:
+        hidden = tf.keras.layers.Dropout(dropout)(hidden)
     outputs = tf.keras.layers.Dense(1, activation='linear')(hidden)
     outputs = outputs * (ymax - ymin) + ymin
     model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
@@ -174,7 +185,7 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Train prediction models')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-i', '--input', help='Model input latent size', default='split', choices=['baseline', 'split'])
-    parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn', 'lstm', 'bilstm', 'att'])
+    parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn1', 'cnn2', 'lstm', 'bilstm', 'att'])
     parser.add_argument('-f', '--firstclasses', help='Delay class when prediction starts', type=int, nargs='+', default=[1, 2, 3, 4, 5])
     parser.add_argument('-l', '--lastclasses', help='Delay class when prediction ends', type=int, nargs='+')
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
@@ -348,9 +359,9 @@ if __name__ == '__main__':
 
                 print(f'Training new model {model_name}:')
 
-                inputs, hidden = model_input(nfeatures, xmin, xmax)
+                inputs, hidden = model_input(np.sum(nfeatures), xmin, xmax)
                 input_type = locals()[args.input]
-                hidden = input_type(hidden)
+                hidden = input_type(hidden, nfeatures)
                 extractor_type = locals()[feature_extractor]
                 hidden = extractor_type(hidden)
                 model = model_output(inputs, hidden, ymin, ymax)
