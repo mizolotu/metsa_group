@@ -201,7 +201,7 @@ if __name__ == '__main__':
     parser.add_argument('-y', '--ylimits', help='Use bleach ratio limits from data?', default=False, type=bool)
     parser.add_argument('-r', '--retrain', help='Retrain model?', default=False, type=bool)
     parser.add_argument('-n', '--ntests', help='Number of tests', type=int, default=1)
-    parser.add_argument('-m', '--mode', help='Mode', default='development', choices=['development', 'production'])
+    parser.add_argument('-m', '--mode', help='Mode', default='development', choices=modes)
     args = parser.parse_args()
 
     # model input layer
@@ -408,7 +408,7 @@ if __name__ == '__main__':
                 pe = pd.read_csv(e_path)
             except:
                 pe = pd.DataFrame({
-                    'Delay classes': [comb for comb in tbl_dc_combs]
+                    dc_combs_col_name: [comb for comb in tbl_dc_combs]
                 })
 
             if model_name not in pe.keys():

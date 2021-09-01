@@ -39,6 +39,8 @@ patience = 100
 
 # other
 
+dc_combs_col_name = 'Delay classes'
+modes = ['development', 'production']
 eps = 1e-10
 csv = '.csv'
 pdf = '.pdf'
