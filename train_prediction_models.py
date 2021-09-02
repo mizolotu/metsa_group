@@ -118,7 +118,7 @@ def lstm(hidden, nhidden=640):
 def lstmatt(hidden, nhidden=1280):
     hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
     hidden = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden)
-    hidden = Attention(hidden)
+    hidden = Attention()(hidden)
     return hidden
 
 def bilstm(hidden, nhidden=640):
