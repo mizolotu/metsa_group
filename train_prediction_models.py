@@ -91,12 +91,14 @@ def cnn1(hidden, nhiddens=[1280, 1280], nfilters=1024, kernel_size=2):
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
-def cnn2(hidden, nfilters=512, kernel_size_row=2, kernel_size_col=64, stride_size=32):
-    hshape = hidden.shape[1:]
-    hidden = tf.expand_dims(hidden, -1)
-    hidden = tf.keras.layers.Conv2D(nfilters, kernel_size=(2, kernel_size_col), strides=(1, stride_size), padding='same', activation='relu')(hidden)
-    #hidden = tf.keras.layers.Conv2D(nfilters, kernel_size=(kernel_size_row, kernel_size_col), padding='same', activation='relu')(hidden)
-    hidden = tf.keras.layers.Conv2D(nfilters, kernel_size=(hshape[0], hshape[1] // stride_size - 1),  activation='relu')(hidden)
+def cnn1m(hidden, nhiddens=[640, 640, 640, 640], nfilters=512):
+    nstreams = len(nhiddens)
+    last_conv_kernel_size = hidden.shape[1] * nstreams
+    hiddens = []
+    for i in range(nstreams):
+        hiddens.append(tf.keras.layers.Conv1D(nhiddens[i], i + 2, padding='same', activation='relu')(hidden))
+    hidden = tf.concat(hiddens, axis=1)
+    hidden = tf.keras.layers.Conv1D(nfilters, last_conv_kernel_size - 1, activation='relu')(hidden)
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
@@ -221,7 +223,7 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Train prediction models')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-i', '--input', help='Model input latent size', default='split', choices=['baseline', 'split'])
-    parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn1', 'cnn2', 'lstm', 'bilstm', 'cnn1lstm', 'lstmatt'])
+    parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn1', 'cnn1m', 'lstm', 'bilstm', 'cnn1lstm', 'lstmatt'])
     parser.add_argument('-f', '--firstclasses', help='Delay class when prediction starts', type=int, nargs='+', default=[1, 2, 3, 4, 5])
     parser.add_argument('-l', '--lastclasses', help='Delay class when prediction ends', type=int, nargs='+')
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
