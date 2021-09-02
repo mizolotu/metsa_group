@@ -115,6 +115,12 @@ def lstm(hidden, nhidden=640):
     hidden = tf.keras.layers.LSTM(nhidden)(hidden)
     return hidden
 
+def lstmatt(hidden, nhidden=1280):
+    hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
+    hidden = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden)
+    hidden = Attention(hidden)
+    return hidden
+
 def bilstm(hidden, nhidden=640):
     hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
     hidden = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(nhidden, activation='relu', return_sequences=False))(hidden)
@@ -132,6 +138,29 @@ class Attention(tf.keras.layers.Layer):
 
     def __init__(self,**kwargs):
         super(Attention, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        self.W = self.add_weight(name="att_weight1",shape=(input_shape[-1], 1),initializer="normal")
+        self.b = self.add_weight(name="att_bias1",shape=(input_shape[1], 1),initializer="zeros")
+        super(Attention, self).build(input_shape)
+
+    def call(self, x):
+        et=tf.squeeze(tf.tanh(tf.tensordot(x, self.W, 1) + self.b), axis=-1)
+        at=tf.math.softmax(et)
+        at=tf.expand_dims(at, axis=-1)
+        output=x * at
+        return tf.math.reduce_sum(output, axis=1)
+
+    def compute_output_shape(self, input_shape):
+        return (input_shape[0], input_shape[-1])
+
+    def get_config(self):
+        return super(Attention, self).get_config()
+
+class Attention2(tf.keras.layers.Layer):
+
+    def __init__(self,**kwargs):
+        super(Attention2, self).__init__(**kwargs)
 
     def build(self, input_shape):
         self.W1 = self.add_weight(name="att_weight1",shape=(input_shape[-1], 1),initializer="normal")
@@ -157,7 +186,7 @@ class Attention(tf.keras.layers.Layer):
         return (input_shape[0], input_shape[-1])
 
     def get_config(self):
-        return super(Attention, self).get_config()
+        return super(Attention2, self).get_config()
 
 def att(hidden, nhidden=640):
     hidden1 = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
@@ -192,7 +221,7 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Train prediction models')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-i', '--input', help='Model input latent size', default='split', choices=['baseline', 'split'])
-    parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn1', 'cnn2', 'lstm', 'bilstm', 'cnn1lstm', 'att'])
+    parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn1', 'cnn2', 'lstm', 'bilstm', 'cnn1lstm', 'lstmatt'])
     parser.add_argument('-f', '--firstclasses', help='Delay class when prediction starts', type=int, nargs='+', default=[1, 2, 3, 4, 5])
     parser.add_argument('-l', '--lastclasses', help='Delay class when prediction ends', type=int, nargs='+')
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)

@@ -72,6 +72,7 @@ if __name__ == '__main__':
                     fc = int(spl[2])
                     er = p[pkey].values[fc - 1]
                 ys[-1].append(er)
+                print(ns[-1], fc, er)
         assert len(ys[-1]) == len(x), print('Length mismatch for x and y')
 
     # plot error
