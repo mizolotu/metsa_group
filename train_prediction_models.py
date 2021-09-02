@@ -91,12 +91,16 @@ def cnn1(hidden, nhiddens=[1280, 1280], nfilters=1024, kernel_size=2):
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
-def cnn1m(hidden, nhiddens=[640, 640, 640, 640], nfilters=512):
+def cnn1m(hidden, nhiddens=[1024, 1024], nfilters=512):
     nstreams = len(nhiddens)
-    last_conv_kernel_size = hidden.shape[1] * nstreams
+    nfilters_max = hidden.shape[1]
+    last_conv_kernel_size = nfilters_max * nstreams
     hiddens = []
     for i in range(nstreams):
-        hiddens.append(tf.keras.layers.Conv1D(nhiddens[i], i + 2, padding='same', activation='relu')(hidden))
+        nf = tf.clip_by_value(nfilters_max - i, clip_value_min=1, clip_value_max=nfilters_max)
+        #nf = np.clip(nfilters_max - i, 1, nfilters_max).astype(int)
+        print(nf, type(nf))
+        hiddens.append(tf.keras.layers.Conv1D(nhiddens[i], (nf,), padding='same', activation='relu')(hidden))
     hidden = tf.concat(hiddens, axis=1)
     hidden = tf.keras.layers.Conv1D(nfilters, last_conv_kernel_size - 1, activation='relu')(hidden)
     hidden = tf.keras.layers.Flatten()(hidden)
