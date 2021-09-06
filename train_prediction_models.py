@@ -27,15 +27,7 @@ def load_data(fpath, tags):
     values = df[tags].values
     labels = df[br_key].values
     timestamps = df[ts_key].values
-    ds = (
-        tf.data.Dataset.from_tensor_slices(
-            (
-                tf.cast(df[tags].values, tf.float32),
-                tf.cast(df[br_key].values, tf.float32)
-            )
-        )
-    )
-    return values, labels, timestamps, tags, ds
+    return values, labels, timestamps
 
 def pad_data(X, x_features, features, delay_classes, dc_comb):
     nan_cols = []
@@ -65,20 +57,16 @@ def model_input(features, xmin, xmax, batchnorm=False):
     # input layer
 
     features_columns = [key for key in features]
-    inputs = {colname: tf.keras.layers.Input(name=colname, shape=(1,), dtype=tf.float32) for colname in features_columns}
+    inputs = {colname: tf.keras.layers.Input(name=f'input_{colname}', shape=(1,), dtype=tf.float32) for colname in features_columns}
     hidden = tf.keras.layers.Concatenate(axis=-1)(list(inputs.values()))
     hidden = tf.keras.layers.Reshape(target_shape=(len(features),))(hidden)
 
-    #inputs = tf.keras.layers.Input(shape=(len(features),))
-
     # deal with nans
 
-    #is_nan = tf.math.is_nan(inputs)
     is_nan = tf.math.is_nan(hidden)
     masks = tf.dtypes.cast(-xmax, tf.float32)
     inputs_nan = tf.dtypes.cast(is_nan, dtype=tf.float32)
     inputs_not_nan = tf.dtypes.cast(tf.math.logical_not(is_nan), dtype=tf.float32)
-    #inputs_without_nan = tf.math.multiply_no_nan(inputs, inputs_not_nan) + tf.math.multiply_no_nan(masks, inputs_nan)
     inputs_without_nan = tf.math.multiply_no_nan(hidden, inputs_not_nan) + tf.math.multiply_no_nan(masks, inputs_nan)
 
     # standardize the input
@@ -317,32 +305,28 @@ if __name__ == '__main__':
         nfeatures = []
         dcs = []
         dc_combs = []
-        dc_comb_fs = []
-        dc_comb_features = []
         tbl_dc_combs = []
         for uc in uclasses:
             dcs.extend(str(uc))
             dc_comb = ','.join([item for item in dcs])
             tbl_dc_combs.append(dc_comb)
             uc_features = [f for f, c in zip(features, classes) if c == uc]
-            dc_comb_fs.extend(uc_features)
             if uc in u_feature_classes_selected:
                 nfeatures.append(len(uc_features))
                 if uc in u_classes_selected:
                     dc_combs.append(dc_comb)
-                    dc_comb_features.append(dc_comb_fs.copy())
 
         print(f'The following feature classes will be used to train the model: {dc_combs}')
 
         # load data
 
-        values, labels, timestamps, val_features, ds = load_data(osp.join(task_dir, features_fname), features_selected)
+        values, labels, timestamps = load_data(osp.join(task_dir, features_fname), features_selected)
 
         # model name
 
         model_name = f'{args.input}_{feature_extractor}_{firstclass}'
         if firstclass != lastclass:
-            model_name = '-'.join([model_name, lastclass])
+            model_name = '-'.join([model_name, str(lastclass)])
 
         # create output directories
 
@@ -406,27 +390,29 @@ if __name__ == '__main__':
             # create datasets by padding certain feature classes
 
             Xtv, Ytv = {}, {}
-
             for stage in stages[:-1]:
-                Xtv[stage] = []
-                Ytv[stage] = []
+                Xtv[stage], Ytv[stage] = {}, {}
+                Xtmp, Ytmp = [], []
                 for dc_comb in dc_combs:
-                    Xtv[stage].append(pad_data(values_k[stage], val_features, features, classes, dc_comb))
-                    Ytv[stage].append(labels_k[stage])
-                Xtv[stage] = np.vstack(Xtv[stage])
-                Ytv[stage] = np.hstack(Ytv[stage])
+                    Xtmp.append(pad_data(values_k[stage], features_selected, features, classes, dc_comb))
+                    Ytmp.append(labels_k[stage])
+                Xtmp = np.vstack(Xtmp)
+                Ytmp = np.hstack(Ytmp)
+                for i, fs in enumerate(features_selected):
+                    Xtv[stage][fs] = Xtmp[:, i]
+                Ytv[stage][br_key] = Ytmp
 
             if args.mode == 'production':
                 stage = stages[1]
             else:
                 stage = stages[2]
             Xi = {}
-            for dc_comb, dc_comb_feature_list in zip(dc_combs, dc_comb_features):
+            for dc_comb in dc_combs:
                 #Xi[dc_comb] = pad_data(values_k[stage], val_features, features, classes, dc_comb)
                 Xi[dc_comb] = {}
-                tmp = pad_data(values_k[stage], val_features, features, classes, dc_comb)
-                for i, fs in enumerate(dc_comb_feature_list):
-                    Xi[dc_comb][fs] = tmp[:, i]
+                Xtmp = pad_data(values_k[stage], features_selected, features, classes, dc_comb)
+                for i, fs in enumerate(features_selected):
+                    Xi[dc_comb][fs] = Xtmp[:, i]
             Yi = labels_k[stage]
             Ti = timestamps_k[stage]
 
@@ -448,18 +434,10 @@ if __name__ == '__main__':
                 model_summary = "\n".join(model_summary_lines)
                 if args.verbose and k == 0:
                     print(model_summary)
-                tr_x, tr_y, val_x, val_y = {}, {}, {}, {}
-                for i, fs in enumerate(features_selected):
-                    tr_x[fs] = Xtv[stages[0]][:, i]
-                    val_x[fs] = Xtv[stages[1]][:, i]
-                tr_y[br_key] = Ytv[stages[0]]
-                val_y[br_key] = Ytv[stages[1]]
 
                 model.fit(
-                    #Xtv[stages[0]], Ytv[stages[0]],
-                    tr_x, tr_y,
-                    #validation_data=(Xtv[stages[1]], Ytv[stages[1]]),
-                    validation_data=(val_x, val_y),
+                    Xtv[stages[0]], Ytv[stages[0]],
+                    validation_data=(Xtv[stages[1]], Ytv[stages[1]]),
                     epochs=epochs,
                     verbose=args.verbose,
                     batch_size=batch_size,
@@ -505,7 +483,6 @@ if __name__ == '__main__':
 
             for dc_comb in dc_combs:
                 predictions = model.predict(Xi[dc_comb])[br_key].flatten()
-                print(predictions)
                 assert len(predictions) == len(Yi)
                 errors[k] = np.mean(np.abs(Yi - predictions))
                 print(f'Prediction error for combination {dc_comb}: {errors[k]}')
@@ -519,6 +496,3 @@ if __name__ == '__main__':
                 model_comb = f'{model_name}_{dc_comb}'
                 pr[model_comb] = predictions
                 pr.to_csv(r_path, index=None)
-
-
-

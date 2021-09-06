@@ -34,9 +34,10 @@ if __name__ == '__main__':
 
     # generate/load test data
 
+
     test_classes = [1, 2]
     features_selected, feature_classes_selected = [list(item) for item in zip(*[(f, c) for f, c in zip(features, classes) if c in test_classes])]
-    values, labels, timestamps, val_features, ds = load_data(osp.join(task_dir, features_fname), features_selected)
+    values, labels, timestamps = load_data(osp.join(task_dir, features_fname), features_selected)
     idx = np.random.choice(len(labels), args.nsamples)
     inf_x = {}
     for i, fs in enumerate(features_selected):
