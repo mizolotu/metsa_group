@@ -1,5 +1,6 @@
-import os, json, tf2onnx
+import os, json
 import os.path as osp
+from typing import Tuple, Dict, Text
 
 import pandas as pd
 import tensorflow as tf
@@ -26,7 +27,15 @@ def load_data(fpath, tags):
     values = df[tags].values
     labels = df[br_key].values
     timestamps = df[ts_key].values
-    return values, labels, timestamps, tags.copy()
+    ds = (
+        tf.data.Dataset.from_tensor_slices(
+            (
+                tf.cast(df[tags].values, tf.float32),
+                tf.cast(df[br_key].values, tf.float32)
+            )
+        )
+    )
+    return values, labels, timestamps, tags, ds
 
 def pad_data(X, x_features, features, delay_classes, dc_comb):
     nan_cols = []
@@ -39,19 +48,38 @@ def pad_data(X, x_features, features, delay_classes, dc_comb):
     X_padded[:, nan_cols] = np.nan
     return X_padded
 
-def model_input(nfeatures, xmin, xmax, batchnorm=False):
+def get_input_graph(input_feature_keys) -> Tuple[tf.keras.layers.Input, tf.keras.layers.Layer]:
+    transformed_columns = [key for key in input_feature_keys]
+    inputs = {colname: tf.keras.layers.Input(name=colname, shape=(1,), dtype=tf.float32) for colname in transformed_columns}
+    hidden = tf.keras.layers.Concatenate(axis=-1)(list(inputs.values()))
+    hidden = tf.keras.layers.Reshape(target_shape=(len(input_feature_keys),))(hidden)
+    return inputs, hidden
+
+def get_output_graph(head_layer, predict_feature_keys) -> Dict[Text, tf.keras.layers.Layer]:
+    return {
+        colname: tf.keras.layers.Dense(units=1, name=colname)(head_layer) for colname in predict_feature_keys
+    }
+
+def model_input(features, xmin, xmax, batchnorm=False):
 
     # input layer
 
-    inputs = tf.keras.layers.Input(shape=(nfeatures,))
+    features_columns = [key for key in features]
+    inputs = {colname: tf.keras.layers.Input(name=colname, shape=(1,), dtype=tf.float32) for colname in features_columns}
+    hidden = tf.keras.layers.Concatenate(axis=-1)(list(inputs.values()))
+    hidden = tf.keras.layers.Reshape(target_shape=(len(features),))(hidden)
+
+    #inputs = tf.keras.layers.Input(shape=(len(features),))
 
     # deal with nans
 
-    is_nan = tf.math.is_nan(inputs)
+    #is_nan = tf.math.is_nan(inputs)
+    is_nan = tf.math.is_nan(hidden)
     masks = tf.dtypes.cast(-xmax, tf.float32)
     inputs_nan = tf.dtypes.cast(is_nan, dtype=tf.float32)
     inputs_not_nan = tf.dtypes.cast(tf.math.logical_not(is_nan), dtype=tf.float32)
-    inputs_without_nan = tf.math.multiply_no_nan(inputs, inputs_not_nan) + tf.math.multiply_no_nan(masks, inputs_nan)
+    #inputs_without_nan = tf.math.multiply_no_nan(inputs, inputs_not_nan) + tf.math.multiply_no_nan(masks, inputs_nan)
+    inputs_without_nan = tf.math.multiply_no_nan(hidden, inputs_not_nan) + tf.math.multiply_no_nan(masks, inputs_nan)
 
     # standardize the input
 
@@ -208,12 +236,13 @@ def bilstm_att(hidden, nhidden=640):
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
-def model_output(inputs, hidden, ymin, ymax, nhidden=2048, dropout=0.5, lr=2.5e-4):
+def model_output(inputs, hidden, target, ymin, ymax, nhidden=2048, dropout=0.5, lr=2.5e-4):
     hidden = tf.keras.layers.Dense(nhidden, activation='relu')(hidden)
     if dropout is not None:
         hidden = tf.keras.layers.Dropout(dropout)(hidden)
     outputs = tf.keras.layers.Dense(1, activation='linear')(hidden)
     outputs = outputs * (ymax - ymin) + ymin
+    outputs = {target: outputs}
     model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
     model.compile(loss=tf.keras.losses.MeanAbsoluteError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
     return model
@@ -228,7 +257,7 @@ if __name__ == '__main__':
     parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn1', 'cnn1m', 'lstm', 'bilstm', 'cnn1lstm', 'lstmatt'])
     parser.add_argument('-f', '--firstclasses', help='Delay class when prediction starts', type=int, nargs='+', default=[1, 2, 3, 4, 5])
     parser.add_argument('-l', '--lastclasses', help='Delay class when prediction ends', type=int, nargs='+')
-    parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
+    parser.add_argument('-s', '--seed', help='Seed', type=int, default=seed)
     parser.add_argument('-g', '--gpu', help='GPU to use')
     parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
     parser.add_argument('-y', '--ylimits', help='Use bleach ratio limits from data?', default=False, type=bool)
@@ -269,7 +298,7 @@ if __name__ == '__main__':
 
     # set seed for results reproduction
 
-    set_seeds(seed)
+    set_seeds(args.seed)
 
     # walk through first and last classes
 
@@ -288,22 +317,26 @@ if __name__ == '__main__':
         nfeatures = []
         dcs = []
         dc_combs = []
+        dc_comb_fs = []
+        dc_comb_features = []
         tbl_dc_combs = []
         for uc in uclasses:
             dcs.extend(str(uc))
             dc_comb = ','.join([item for item in dcs])
             tbl_dc_combs.append(dc_comb)
-            nf = len([c for c in classes if c == uc])
+            uc_features = [f for f, c in zip(features, classes) if c == uc]
+            dc_comb_fs.extend(uc_features)
             if uc in u_feature_classes_selected:
-                nfeatures.append(nf)
+                nfeatures.append(len(uc_features))
                 if uc in u_classes_selected:
                     dc_combs.append(dc_comb)
+                    dc_comb_features.append(dc_comb_fs.copy())
 
         print(f'The following feature classes will be used to train the model: {dc_combs}')
 
         # load data
 
-        values, labels, timestamps, val_features = load_data(osp.join(task_dir, features_fname), features_selected)
+        values, labels, timestamps, val_features, ds = load_data(osp.join(task_dir, features_fname), features_selected)
 
         # model name
 
@@ -388,8 +421,12 @@ if __name__ == '__main__':
             else:
                 stage = stages[2]
             Xi = {}
-            for dc_comb in dc_combs:
-                Xi[dc_comb] = pad_data(values_k[stage], val_features, features, classes, dc_comb)
+            for dc_comb, dc_comb_feature_list in zip(dc_combs, dc_comb_features):
+                #Xi[dc_comb] = pad_data(values_k[stage], val_features, features, classes, dc_comb)
+                Xi[dc_comb] = {}
+                tmp = pad_data(values_k[stage], val_features, features, classes, dc_comb)
+                for i, fs in enumerate(dc_comb_feature_list):
+                    Xi[dc_comb][fs] = tmp[:, i]
             Yi = labels_k[stage]
             Ti = timestamps_k[stage]
 
@@ -399,21 +436,30 @@ if __name__ == '__main__':
 
                 print(f'Training new model {model_name}:')
 
-                inputs, hidden = model_input(np.sum(nfeatures), xmin, xmax)
+                #inputs, hidden = model_input(np.sum(nfeatures), xmin, xmax)
+                inputs, hidden = model_input(features_selected, xmin, xmax)
                 input_type = locals()[args.input]
                 hidden = input_type(hidden, nfeatures)
                 extractor_type = locals()[feature_extractor]
                 hidden = extractor_type(hidden)
-                model = model_output(inputs, hidden, ymin, ymax)
+                model = model_output(inputs, hidden, br_key, ymin, ymax)
                 model_summary_lines = []
                 model.summary(print_fn=lambda x: model_summary_lines.append(x))
                 model_summary = "\n".join(model_summary_lines)
                 if args.verbose and k == 0:
                     print(model_summary)
+                tr_x, tr_y, val_x, val_y = {}, {}, {}, {}
+                for i, fs in enumerate(features_selected):
+                    tr_x[fs] = Xtv[stages[0]][:, i]
+                    val_x[fs] = Xtv[stages[1]][:, i]
+                tr_y[br_key] = Ytv[stages[0]]
+                val_y[br_key] = Ytv[stages[1]]
 
                 model.fit(
-                    Xtv[stages[0]], Ytv[stages[0]],
-                    validation_data=(Xtv[stages[1]], Ytv[stages[1]]),
+                    #Xtv[stages[0]], Ytv[stages[0]],
+                    tr_x, tr_y,
+                    #validation_data=(Xtv[stages[1]], Ytv[stages[1]]),
+                    validation_data=(val_x, val_y),
                     epochs=epochs,
                     verbose=args.verbose,
                     batch_size=batch_size,
@@ -431,7 +477,6 @@ if __name__ == '__main__':
                 model.save(m_path)
                 with open(osp.join(m_path, summary_txt), 'w') as f:
                     f.write(model_summary)
-                _, _ = tf2onnx.convert.from_keras(model, output_path=osp.join(m_path, model_onnx))
 
             # results tables
 
@@ -459,7 +504,8 @@ if __name__ == '__main__':
             # calculate prediction error for each class combination
 
             for dc_comb in dc_combs:
-                predictions = model.predict(Xi[dc_comb]).flatten()
+                predictions = model.predict(Xi[dc_comb])[br_key].flatten()
+                print(predictions)
                 assert len(predictions) == len(Yi)
                 errors[k] = np.mean(np.abs(Yi - predictions))
                 print(f'Prediction error for combination {dc_comb}: {errors[k]}')
