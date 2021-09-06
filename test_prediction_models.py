@@ -1,4 +1,6 @@
 import argparse as arp
+import json
+
 import pandas as pd
 import os.path as osp
 import numpy as np
@@ -18,31 +20,56 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Test prediction models')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=seed)
-    parser.add_argument('-n', '--nsamples', help='Number of test samples', type=int, default=10)
+    parser.add_argument('-n', '--new', help='New example data?', type=bool, default=False)
     args = parser.parse_args()
+
+    # task dir
+
+    task_dir = osp.join(data_dir, args.task)
 
     # set seed for results reproduction
 
     set_seeds(seed)
 
-    # laod meta
+    # try to load example data
 
-    task_dir = osp.join(data_dir, args.task)
-    meta = load_meta(osp.join(task_dir, meta_fname))
-    features = meta['features']
-    classes = meta['classes']
+    do_generate_new_data = True
+    if args.new is None or args.new is False:
+        try:
+            with open(osp.join(task_dir, example_samples_fname), 'r') as f:
+                example_data = json.load(f)
+                do_generate_new_data = False
+        except Exception as e:
+            print(e)
 
-    # generate/load test data
+    # otherwise generate new from features.csv
 
+    if do_generate_new_data:
 
-    test_classes = [1, 2]
-    features_selected, feature_classes_selected = [list(item) for item in zip(*[(f, c) for f, c in zip(features, classes) if c in test_classes])]
-    values, labels, timestamps = load_data(osp.join(task_dir, features_fname), features_selected)
-    idx = np.random.choice(len(labels), args.nsamples)
-    inf_x = {}
-    for i, fs in enumerate(features_selected):
-        inf_x[fs] = values[idx, i].tolist()
-    data = json.dumps(inf_x)
+        # laod meta
+
+        task_dir = osp.join(data_dir, args.task)
+        meta = load_meta(osp.join(task_dir, meta_fname))
+        features = meta['features']
+        classes = meta['classes']
+
+        # load data
+
+        example_data = []
+        u_classes = np.unique(classes)
+        for i in range(len(u_classes)):
+            features_selected, feature_classes_selected = [list(item) for item in zip(*[(f, c) for f, c in zip(features, classes) if c in u_classes[:i+1]])]
+            values, labels, timestamps = load_data(osp.join(task_dir, features_fname), features_selected)
+            idx = np.random.randint(len(labels))
+            inf_x = {}
+            for i, fs in enumerate(features_selected):
+                inf_x[fs] = values[idx, i]
+            example_data.append(inf_x)
+
+        # save data
+
+        with open(osp.join(task_dir, example_samples_fname), 'w') as f:
+            json.dump(example_data, f)
 
     # scoring init
 
@@ -50,4 +77,6 @@ if __name__ == '__main__':
 
     # scoring run
 
-    run(data)
+    for sample in example_data:
+        data = json.dumps(sample)
+        run(data)
