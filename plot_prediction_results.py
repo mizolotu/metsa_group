@@ -15,8 +15,8 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Plot prediction errors')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=modes)
-    parser.add_argument('-e', '--extractors', help='Feature extractors', nargs='+', default=['split_mlp', 'split_lstm', 'split_bilstm'])
-    parser.add_argument('-l', '--lines', help='Number of lines for each dash: solid, dashed, dotted, dash-dotted', type=int, nargs='+', default=[1, 2])
+    parser.add_argument('-e', '--extractors', help='Feature extractors', nargs='+', default=['split_cnn1', 'split_cnn1lstm'])
+    parser.add_argument('-l', '--lines', help='Number of lines for each dash: solid, dashed, dotted, dash-dotted', type=int, nargs='+', default=[1, 1])
     args = parser.parse_args()
 
     # sanitize input

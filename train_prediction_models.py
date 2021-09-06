@@ -1,4 +1,4 @@
-import os, json
+import os, json, tf2onnx
 import os.path as osp
 
 import pandas as pd
@@ -431,6 +431,7 @@ if __name__ == '__main__':
                 model.save(m_path)
                 with open(osp.join(m_path, summary_txt), 'w') as f:
                     f.write(model_summary)
+                _, _ = tf2onnx.convert.from_keras(model, output_path=osp.join(m_path, model_onnx))
 
             # results tables
 

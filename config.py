@@ -14,6 +14,7 @@ permutation_error_csv = 'permutation_error.csv'
 prediction_results_fname = 'prediction_results.csv'
 prediction_errors_fname = 'prediction_errors.csv'
 summary_txt = 'summary.txt'
+model_onnx = 'model.onnx'
 
 # data
 
