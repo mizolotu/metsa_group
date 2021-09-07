@@ -450,11 +450,11 @@ if __name__ == '__main__':
                     )]
                 )
 
-                # save model
+            # save model
 
-                model.save(m_path)
-                with open(osp.join(m_path, summary_txt), 'w') as f:
-                    f.write(model_summary)
+            model.save(m_path)
+            with open(osp.join(m_path, summary_txt), 'w') as f:
+                f.write(model_summary)
 
             # results tables
 
