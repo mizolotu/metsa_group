@@ -38,6 +38,10 @@ batch_size = 512
 epochs = 10000
 patience = 100
 
+# azure
+
+endpoint_jyu = 'http://20.93.236.203/api/v1/service/metsa-brp/score'
+
 # other
 
 dc_combs_col_name = 'Delay classes'
@@ -45,3 +49,4 @@ modes = ['development', 'production']
 eps = 1e-10
 csv = '.csv'
 pdf = '.pdf'
+

@@ -1,17 +1,10 @@
-import argparse as arp
-import json
-
-import pandas as pd
-import os.path as osp
+import json, requests
 import numpy as np
+import argparse as arp
+import os.path as osp
 
 from train_prediction_models import set_seeds, load_meta, load_data
 from config import *
-from scoring import *
-
-def generate_test_data(data, features, feature_classes, nsamples, outpit_dir):
-    X, Y = {}, {}
-    return X, Y
 
 if __name__ == '__main__':
 
@@ -64,6 +57,7 @@ if __name__ == '__main__':
             inf_x = {}
             for i, fs in enumerate(features_selected):
                 inf_x[fs] = values[idx, i]
+            inf_x[br_key] = labels[idx]
             example_data.append(inf_x)
 
         # save data
@@ -73,10 +67,32 @@ if __name__ == '__main__':
 
     # scoring init
 
-    init()
+    #init()
 
     # scoring run
 
-    for sample in example_data:
+    # endpoint
+
+    endpoint_url = 'http://20.93.236.203/api/v1/service/metsa-brp/score'
+
+    # scoring
+
+    for i, sample in enumerate(example_data):
+        label = sample.pop(br_key)
+        for key in sample:
+            if np.isnan(sample[key]):
+                print(key, sample[key], type(sample[key]))
+        r = requests.post(url=endpoint_url, json=sample)
+        print(r)
+        jdata = r.json()
+        print(f'Example {i}: prediction = {jdata[br_key]}, label = {label}')
+
+    for i, sample in enumerate(example_data):
+        label = sample.pop(br_key)
+        print('here')
+        for key in sample:
+            if np.isnan(sample[key]):
+                print(key, sample[key], type(sample[key]))
         data = json.dumps(sample)
-        run(data)
+        result = run(data)
+        print(f'Example {i}: prediction = {result}, label = {label}')

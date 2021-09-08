@@ -1,0 +1,10 @@
+name: test
+channels:
+    - defaults
+dependencies:
+    - python=3.8
+    - numpy
+    - tensorflow
+    - pip
+    - pip:
+          - azureml-defaults

@@ -2,8 +2,9 @@ pandas
 numpy
 sklearn
 scipy
-tensorflow
+tensorflow==2.5.0
 openpyxl
 python-dateutil
 matplotlib
 seaborn
+requests==2.25.1
