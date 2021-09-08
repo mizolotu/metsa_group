@@ -31,6 +31,6 @@ if __name__ == '__main__':
         jdata = r.json()
         print(f"Example {i + 1} (features of classes {', '.join(dc_comb)}):\nInput: {sample}')")
         if jdata['status'] == 'ok':
-            print(f"Real value = {label}, predicted value = {jdata[br_key]}, model used = {jdata['model']}\n")
+            print(f"Real value: {label}, predicted value: {jdata[br_key]}, model used: {jdata['model']}\n")
         else:
             print('Something went wrong :(')
