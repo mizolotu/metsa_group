@@ -41,7 +41,7 @@ az ml model register -n metsa_brp -p <path to the model, e.g. models/predict_ble
 5. Test the deployment, e.g.:
 
 ```bash
-python3 simple_endpoint_test.py
+python3 predict_bleach_ratio_endpoint_test.py
 ```
 
 ### Calculate feature importance (this code is now a bit broken, fixing now...)
