@@ -1,4 +1,4 @@
-import os, urllib, sqlalchemy, pandas
+import os, urllib, sqlalchemy, json, pandas
 
 scriptpath = os.path.abspath(__file__)
 scriptdir = os.path.dirname(scriptpath)
@@ -6,48 +6,45 @@ scriptdir = os.path.dirname(scriptpath)
 server = 'tcp:jyusqlserver.database.windows.net'
 database = 'IoTSQL'
 driver = '{ODBC Driver 17 for SQL Server}'
-table = 'WindSpeedPrediction'
+table = 'metsa_brp_sample_data'
 username = 'jyusqlserver'
-password = '#jyusql1'
+password = ''
 
 db_connection_str = f'DRIVER={driver};SERVER={server};PORT=1433;DATABASE={database};UID={username};PWD={password}'
-
 params = urllib.parse.quote_plus(db_connection_str)
 engine = sqlalchemy.create_engine(f"mssql+pyodbc:///?odbc_connect={params}")
 meta = sqlalchemy.MetaData(engine)
-table_pointer = sqlalchemy.Table(
-    table,
-    meta,
-    sqlalchemy.Column('id', sqlalchemy.Integer, primary_key=True),
-    sqlalchemy.Column('temperature', sqlalchemy.Float),
-    sqlalchemy.Column('humidity', sqlalchemy.Float),
-    sqlalchemy.Column('pressure', sqlalchemy.Float),
-    sqlalchemy.Column('windspeed', sqlalchemy.Float)
-)
-meta.create_all(checkfirst=True)  # Only create tables if they don't exist.
-conn = engine.connect()
 
-import pickle, os
-import tensorflow as tf
-import numpy as np
+def load_columns(fname):
+    fpath = os.path.join(scriptdir, fname)
+    columns = None
+    try:
+        with open(fpath) as f:
+            columns = json.load(f)
+    except Exception as e:
+        print(e)
+    return columns
 
-scriptpath = os.path.abspath(__file__)
-scriptdir = os.path.dirname(scriptpath)
+def create_table_pointer(columns):
+    table_pointer = sqlalchemy.Table(
+        table,
+        meta,
+        sqlalchemy.Column(columns['timestamp'], sqlalchemy.String),
+        *[sqlalchemy.Column(key, sqlalchemy.Float) for key in columns['features']],
+        sqlalchemy.Column(columns['label'], sqlalchemy.Float)
+    )
+    meta.create_all(checkfirst=True)
+    conn = engine.connect()
+    return table_pointer, conn
 
-# scaler
+columns = load_columns('metainfo.json')
+table_pointer, conn = create_table_pointer(columns)
 
-scaler_fpath = os.path.join(scriptdir, 'scaler.pkl')
-with open(scaler_fpath, 'rb') as f:
-    scaler = pickle.load(f)
+def insert_data_row(sample):
+    ins = table_pointer.insert()
+    conn.execute(ins.values(sample))
 
-# model
-
-model_pb = os.path.join(scriptdir, 'model.pb')
-graph_def = tf.compat.v1.GraphDef()
-input_layer = 'input:0'
-output_layer = 'output:0'
-
-def get_data_rows(null_column):
+def get_data_rows(n):
     sql_df = pandas.read_sql(
         f'SELECT * FROM {table} WHERE {null_column} IS NULL',
         con=engine
