@@ -14,40 +14,62 @@
 3. Export bleach ratio data from Azure in csv format, name it for example "some_samples.csv", and put it into ```data/raw```
 4. pip3 install -r requirements
 
-### How to use
+### Train and deploy prediction models
 
 1. Create datasets:
 
 ```bash
-python3 create_datasets.py -s <csv file with samples, e.g. some_samples.csv>
+python3 create_datasets.py
 ```
 
-2. Calculate feature correlation with the target variable:
+2. Train prediction models:
+
+```bash
+python3 train_prediction_models.py -e <feature extractor, e.g. cnn1>
+```
+
+3. Register model on Azure:
+
+```bash
+az ml model register -n metsa_brp -p <path to the model, e.g. models/predict_bleach_ratio/production>
+```
+
+4. Deploy the model on Azure using ```scoring.py``` as the entry script and ```environment.yml``` as the dependencies file.
+
+5. Test the deployment, e.g.:
+
+```bash
+python3 simple_endpoint_test.py
+```
+
+### Calculate feature importance (this part is now a bit broken, need to edit)
+
+1. Calculate feature correlation with the target variable:
 
 ```bash
 python3 calculate_target_correlation.py
 ```
 
-3. Calculate permutation feature importance:
+2. Calculate permutation feature importance:
 
 ```bash
 python3 calculate_permutation_importance.py -m <prediction model, e.g. cnn> -l <model layer sizes, e.g. 2048 2048>
 ```
 
-4. Calculate feature importance based on prediction error:
+3. Calculate feature importance based on prediction error:
 
 ```bash
 python3 calculate_prediction_error.py -e <evaluation method: selected, not-selected or permuted> -m <prediction model, e.g. cnn> -l <model layer sizes, e.g. 2048 2048>
 ```
 
-5. Plot feature importance:
+4. Plot feature importance:
 
 ```bash
 python3 plot_feature_importance.py
 ```
 <img src="figures/predict_bleach_ratio/features_ranked.png" width="800"/>
 
-6. One can also plot a particular feature values against the target variable:
+5. One can also plot a particular feature values against the target variable:
 
 ```bash
 python3 plot_feature_values.py -f <feature name, e.g. 126A0333-QI>
