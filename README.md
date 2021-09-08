@@ -5,13 +5,15 @@
 ### Requirements
 
 1. Access to the data
-2. Python 3.8.5
+2. Python 3.8
+3. Azure inference cluster by default has tensorflow 2.5.0, models trained in tf 2.6.0 cannot be loaded in keras due to some compatibility issue, keep that in mind
+4. Looks like requests 2.26 has bug with json (probably, allow_nan set as False), therefore requests 2.25.1 should be used for the endpoint testing
 
 ### Installation
 
 1. Clone this repository
 2. Create directory ```raw``` in directory ```data```
-3. Export bleach ratio data from Azure in csv format, name it for example "some_samples.csv", and put it into ```data/raw```
+3. Export bleach ratio data files from Azure in csv format and put them into ```data/raw```
 4. pip3 install -r requirements
 
 ### Train and deploy prediction models
@@ -25,7 +27,7 @@ python3 create_datasets.py
 2. Train prediction models:
 
 ```bash
-python3 train_prediction_models.py -e <feature extractor, e.g. cnn1>
+python3 train_prediction_models.py -e <feature extractor, e.g. cnn1> -m <mode: development or production>
 ```
 
 3. Register model on Azure:
@@ -42,7 +44,7 @@ az ml model register -n metsa_brp -p <path to the model, e.g. models/predict_ble
 python3 simple_endpoint_test.py
 ```
 
-### Calculate feature importance (this code is now a bit broken, need to edit)
+### Calculate feature importance (this code is now a bit broken, fixing now...)
 
 1. Calculate feature correlation with the target variable:
 
