@@ -6,9 +6,10 @@ scriptdir = os.path.dirname(scriptpath)
 server = 'tcp:jyusqlserver.database.windows.net'
 database = 'IoTSQL'
 driver = '{ODBC Driver 17 for SQL Server}'
-table = 'metsa_brp_sample_data'
+data_table = 'metsa_brp_sample_data'
+prediction_table = 'metsa_brp_sample_predictions'
 username = 'jyusqlserver'
-password = ''
+password = '#jyusql1'
 
 db_connection_str = f'DRIVER={driver};SERVER={server};PORT=1433;DATABASE={database};UID={username};PWD={password}'
 params = urllib.parse.quote_plus(db_connection_str)
@@ -25,53 +26,49 @@ def load_columns(fname):
         print(e)
     return columns
 
-def create_table_pointer(columns):
+def create_data_table_pointer(columns):
     table_pointer = sqlalchemy.Table(
-        table,
+        data_table,
         meta,
         sqlalchemy.Column(columns['timestamp'], sqlalchemy.String),
         *[sqlalchemy.Column(key, sqlalchemy.Float) for key in columns['features']],
         sqlalchemy.Column(columns['label'], sqlalchemy.Float)
+    )
+    #meta.create_all(checkfirst=True)
+    conn = engine.connect()
+    return table_pointer, conn
+
+def create_prediction_table_pointer(columns):
+    uclasses = sorted(list(set(columns['classes'])))
+    cols = [f'Prediction {uc}' for uc in uclasses] + [f'Prediction {uc} error' for uc in uclasses]
+    table_pointer = sqlalchemy.Table(
+        data_table,
+        meta,
+        sqlalchemy.Column(columns['timestamp'], sqlalchemy.String),
+        sqlalchemy.Column(columns['label'], sqlalchemy.Float),
+        *cols
     )
     meta.create_all(checkfirst=True)
     conn = engine.connect()
     return table_pointer, conn
 
 columns = load_columns('metainfo.json')
-table_pointer, conn = create_table_pointer(columns)
+data_table_pointer, data_table_connection = create_data_table_pointer(columns)
+prediction_table_pointer, prediction_table_connection = create_prediction_table_pointer(columns)
 
-def insert_data_row(sample):
-    ins = table_pointer.insert()
-    conn.execute(ins.values(sample))
+def insert_prediction_row(sample):
+    ins = prediction_table_pointer.insert()
+    prediction_table_connection.execute(ins.values(sample))
 
-def get_data_rows(n):
+def get_n_last_data_rows(table, n, desc_col_name):
     sql_df = pandas.read_sql(
-        f'SELECT * FROM {table} WHERE {null_column} IS NULL',
+        f'SELECT TOP ({n}) * FROM {table} order by {desc_col_name} desc',
         con=engine
     )
     return sql_df
 
-def update_row(id, value):
+def update_data_row(id, value):
     upd = table_pointer.update()
     conn.execute(
         upd.where(table_pointer.c.id == id).values(windspeed=value)
     )
-
-def init():
-    with tf.io.gfile.GFile(model_pb, 'rb') as f:
-        graph_def.ParseFromString(f.read())
-        tf.import_graph_def(graph_def, name='')
-
-def predict(x):
-    init()
-    nsamples = x.shape[0]
-    xy = np.hstack([x, np.zeros((nsamples, 1))])
-    xy_std = scaler.transform(xy)
-    x_std = xy_std[:, :-1]
-    with tf.compat.v1.Session() as sess:
-        prob_tensor = sess.graph.get_tensor_by_name(output_layer)
-        y_std = sess.run(prob_tensor, {input_layer: x_std})
-    xy_std = np.hstack([x_std, y_std])
-    xy = scaler.inverse_transform(xy_std)
-    y = xy[:, -1]
-    return y
