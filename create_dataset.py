@@ -1,4 +1,4 @@
-import os, json
+import os, json, shutil
 import argparse as arp
 import os.path as osp
 import sys
@@ -6,11 +6,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-from itertools import chain, combinations
 from config import *
-
-def powerset(items):
-    return chain.from_iterable(combinations(items, r) for r in range(1, len(items)+1))
 
 if __name__ == '__main__':
 
@@ -98,7 +94,7 @@ if __name__ == '__main__':
 
     # meta
 
-    meta = {'features': features, 'classes': delay_classes, 'label': br_key}
+    meta = {'features': features, 'classes': delay_classes, 'label': br_key, 'timestamp': ts_key}
 
     # output directory
 
@@ -119,3 +115,12 @@ if __name__ == '__main__':
     meta_fpath = osp.join(task_dir, meta_fname)
     with open(meta_fpath, 'w') as jf:
         json.dump(meta, jf)
+
+    # copy meta to each function directory
+
+    if osp.isdir(functions_dir):
+        dnames = os.listdir(functions_dir)
+        for dname in dnames:
+            dpath = osp.join(functions_dir, dname)
+            if osp.isdir(dpath):
+                shutil.copy(meta_fpath, dpath)

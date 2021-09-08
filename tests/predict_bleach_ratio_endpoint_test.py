@@ -14,7 +14,8 @@ if __name__ == '__main__':
 
     # task dir
 
-    task_dir = osp.join(data_dir, args.task)
+    task = 'predict_bleach_ratio'
+    task_dir = osp.join(data_dir, task)
 
     # load example data
 

@@ -5,6 +5,8 @@ raw_data_dir = f'{data_dir}/raw'
 models_dir = 'models'
 results_dir = 'results'
 figures_dir = 'figures'
+functions_dir = 'functions'
+
 tags_fname = 'tags.xlsx'
 features_fname = 'features.csv'
 meta_fname = 'metainfo.json'
@@ -41,6 +43,7 @@ patience = 100
 # azure
 
 endpoint_jyu = 'http://20.93.236.203/api/v1/service/metsa-brp/score'
+insert_data_sample_function_url = 'http://localhost:7071/api/insert_sample_data_row'
 
 # other
 

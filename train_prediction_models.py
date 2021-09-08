@@ -1,6 +1,5 @@
-import os, json
+import os
 import os.path as osp
-from typing import Tuple, Dict, Text
 
 import pandas as pd
 import tensorflow as tf
@@ -8,232 +7,8 @@ import numpy as np
 import argparse as arp
 
 from config import *
-
-def load_meta(fpath):
-    meta = None
-    try:
-        with open(fpath) as f:
-            meta = json.load(f)
-    except Exception as e:
-        print(e)
-    return meta
-
-def set_seeds(seed):
-    tf.random.set_seed(seed)
-    np.random.seed(seed)
-
-def load_data(fpath, tags):
-    df = pd.read_csv(fpath)
-    values = df[tags].values
-    labels = df[br_key].values
-    timestamps = df[ts_key].values
-    return values, labels, timestamps
-
-def pad_data(X, x_features, features, delay_classes, dc_comb):
-    nan_cols = []
-    dc_comb = [int(dc) for dc in dc_comb.split(',')]
-    for i, xf in enumerate(x_features):
-        dc = delay_classes[features.index(xf)]
-        if dc not in dc_comb:
-            nan_cols.append(i)
-    X_padded = X.copy()
-    X_padded[:, nan_cols] = np.nan
-    return X_padded
-
-def get_input_graph(input_feature_keys) -> Tuple[tf.keras.layers.Input, tf.keras.layers.Layer]:
-    transformed_columns = [key for key in input_feature_keys]
-    inputs = {colname: tf.keras.layers.Input(name=colname, shape=(1,), dtype=tf.float32) for colname in transformed_columns}
-    hidden = tf.keras.layers.Concatenate(axis=-1)(list(inputs.values()))
-    hidden = tf.keras.layers.Reshape(target_shape=(len(input_feature_keys),))(hidden)
-    return inputs, hidden
-
-def get_output_graph(head_layer, predict_feature_keys) -> Dict[Text, tf.keras.layers.Layer]:
-    return {
-        colname: tf.keras.layers.Dense(units=1, name=colname)(head_layer) for colname in predict_feature_keys
-    }
-
-def model_input(features, xmin, xmax, batchnorm=False):
-
-    # input layer
-
-    features_columns = [key for key in features]
-    inputs = {colname: tf.keras.layers.Input(name=f'input_{colname}', shape=(1,), dtype=tf.float32) for colname in features_columns}
-    hidden = tf.keras.layers.Concatenate(axis=-1)(list(inputs.values()))
-    hidden = tf.keras.layers.Reshape(target_shape=(len(features),))(hidden)
-
-    # deal with nans
-
-    is_nan = tf.math.is_nan(hidden)
-    masks = tf.dtypes.cast(-xmax, tf.float32)
-    inputs_nan = tf.dtypes.cast(is_nan, dtype=tf.float32)
-    inputs_not_nan = tf.dtypes.cast(tf.math.logical_not(is_nan), dtype=tf.float32)
-    inputs_without_nan = tf.math.multiply_no_nan(hidden, inputs_not_nan) + tf.math.multiply_no_nan(masks, inputs_nan)
-
-    # standardize the input
-
-    inputs_std = (inputs_without_nan - xmin) / (xmax - xmin + eps)
-    if batchnorm:
-        hidden = tf.keras.layers.BatchNormalization()(inputs_std)
-    else:
-        hidden = inputs_std
-
-    return inputs, hidden
-
-def baseline(hidden, nfeatures, latent_dim=256):
-    hidden = tf.keras.layers.Dense(latent_dim * len(nfeatures), activation='relu')(hidden)
-    return hidden
-
-def split(hidden, nfeatures, latent_dim=256):
-    hidden_spl = tf.split(hidden, nfeatures, axis=1)
-    hidden = []
-    for spl in hidden_spl:
-        hidden.append(tf.keras.layers.Dense(latent_dim, activation='relu')(spl))
-    hidden = tf.stack(hidden, axis=1)
-    return hidden
-
-def mlp(hidden, nhiddens=[2048, 2048], dropout=0.5):
-    hidden = tf.keras.layers.Flatten()(hidden)
-    for nhidden in nhiddens:
-        hidden = tf.keras.layers.Dense(nhidden, activation='relu')(hidden)
-        if dropout is not None:
-            hidden = tf.keras.layers.Dropout(dropout)(hidden)
-    return hidden
-
-def cnn1(hidden, nhiddens=[1280, 1280], nfilters=1024, kernel_size=2):
-    last_conv_kernel_size = hidden.shape[1]
-    for nhidden in nhiddens:
-        hidden = tf.keras.layers.Conv1D(nhidden, kernel_size, padding='same', activation='relu')(hidden)
-    hidden = tf.keras.layers.Conv1D(nfilters, last_conv_kernel_size, activation='relu')(hidden)
-    hidden = tf.keras.layers.Flatten()(hidden)
-    return hidden
-
-def cnn1m(hidden, nhiddens=[1280, 1280], nfilters=1024):
-    nstreams = len(nhiddens)
-    nfilters_max = hidden.shape[1]
-    last_conv_kernel_size = nfilters_max * nstreams
-    hiddens = []
-    for i in range(nstreams):
-        nf = np.clip(nfilters_max - i, 1, nfilters_max).astype(int)
-        hiddens.append(tf.keras.layers.Conv1D(nhiddens[i], (nf,), padding='same', activation='relu')(hidden))
-    hidden = tf.concat(hiddens, axis=1)
-    hidden = tf.keras.layers.Conv1D(nfilters, last_conv_kernel_size, activation='relu')(hidden)
-    hidden = tf.keras.layers.Flatten()(hidden)
-    return hidden
-
-def attention_block(x, nh):
-    q = tf.keras.layers.Dense(nh, activation='relu')(x)
-    v = tf.keras.layers.Dense(nh, activation='relu')(x)
-    a = tf.keras.layers.Dense(1)(tf.nn.tanh(q + v))
-    a = tf.keras.layers.Softmax(axis=1)(a)
-    h = tf.keras.layers.Multiply()([a, v])
-    h = tf.reduce_sum(h, axis=1)
-    return h
-
-def lstm(hidden, nhidden=640):
-    hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
-    hidden = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden)
-    hidden = tf.keras.layers.LSTM(nhidden)(hidden)
-    return hidden
-
-def lstmatt(hidden, nhidden=1280):
-    hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
-    hidden = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden)
-    hidden = Attention()(hidden)
-    return hidden
-
-def bilstm(hidden, nhidden=640):
-    hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
-    hidden = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(nhidden, activation='relu', return_sequences=False))(hidden)
-    hidden = tf.keras.layers.Flatten()(hidden)
-    return hidden
-
-def cnn1lstm(hidden, nfilters=[1280, 1280], kernel_size=2, nhidden=640):
-    for nf in nfilters:
-        hidden = tf.keras.layers.Conv1D(nf, kernel_size, padding='same', activation='relu')(hidden)
-    hidden = tf.keras.layers.LSTM(nhidden, activation='relu', return_sequences=False)(hidden)
-    hidden = tf.keras.layers.Flatten()(hidden)
-    return hidden
-
-class Attention(tf.keras.layers.Layer):
-
-    def __init__(self,**kwargs):
-        super(Attention, self).__init__(**kwargs)
-
-    def build(self, input_shape):
-        self.W = self.add_weight(name="att_weight1",shape=(input_shape[-1], 1),initializer="normal")
-        self.b = self.add_weight(name="att_bias1",shape=(input_shape[1], 1),initializer="zeros")
-        super(Attention, self).build(input_shape)
-
-    def call(self, x):
-        et=tf.squeeze(tf.tanh(tf.tensordot(x, self.W, 1) + self.b), axis=-1)
-        at=tf.math.softmax(et)
-        at=tf.expand_dims(at, axis=-1)
-        output=x * at
-        return tf.math.reduce_sum(output, axis=1)
-
-    def compute_output_shape(self, input_shape):
-        return (input_shape[0], input_shape[-1])
-
-    def get_config(self):
-        return super(Attention, self).get_config()
-
-class Attention2(tf.keras.layers.Layer):
-
-    def __init__(self,**kwargs):
-        super(Attention2, self).__init__(**kwargs)
-
-    def build(self, input_shape):
-        self.W1 = self.add_weight(name="att_weight1",shape=(input_shape[-1], 1),initializer="normal")
-        self.b1 = self.add_weight(name="att_bias1",shape=(input_shape[1] // 2, 1),initializer="zeros")
-        self.W2 = self.add_weight(name="att_weight2", shape=(input_shape[-1], 1), initializer="normal")
-        self.b2 = self.add_weight(name="att_bias2", shape=(input_shape[1] // 2, 1), initializer="zeros")
-        super(Attention, self).build(input_shape)
-
-    def call(self, x):
-        x1, x2 = tf.split(x, num_or_size_splits=2, axis=1)
-        et1=tf.squeeze(tf.tanh(tf.tensordot(x1, self.W1, 1) + self.b1), axis=-1)
-        at1=tf.math.softmax(et1)
-        at1=tf.expand_dims(at1, axis=-1)
-        output1=x2 * at1
-        et2 = tf.squeeze(tf.tanh(tf.tensordot(x2, self.W2, 1) + self.b2), axis=-1)
-        at2 = tf.math.softmax(et2)
-        at2 = tf.expand_dims(at2, axis=-1)
-        output2 = x1 * at2
-        output = tf.concat([output1, output2], axis=1)
-        return tf.math.reduce_sum(output, axis=1)
-
-    def compute_output_shape(self, input_shape):
-        return (input_shape[0], input_shape[-1])
-
-    def get_config(self):
-        return super(Attention2, self).get_config()
-
-def att(hidden, nhidden=640):
-    hidden1 = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
-    hidden1 = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden1)
-    hidden2 = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
-    hidden2 = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden2)
-    hidden = tf.concat([hidden1, hidden2], axis=1)
-    hidden = Attention()(hidden)
-    return hidden
-
-def bilstm_att(hidden, nhidden=640):
-    hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
-    hidden = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(nhidden, activation='relu', return_sequences=True))(hidden)
-    hidden = Attention()(hidden)
-    hidden = tf.keras.layers.Flatten()(hidden)
-    return hidden
-
-def model_output(inputs, hidden, target, ymin, ymax, nhidden=2048, dropout=0.5, lr=2.5e-4):
-    hidden = tf.keras.layers.Dense(nhidden, activation='relu')(hidden)
-    if dropout is not None:
-        hidden = tf.keras.layers.Dropout(dropout)(hidden)
-    outputs = tf.keras.layers.Dense(1, activation='linear')(hidden)
-    outputs = outputs * (ymax - ymin) + ymin
-    outputs = {target: outputs}
-    model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-    model.compile(loss=tf.keras.losses.MeanAbsoluteError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
-    return model
+from common.utils import set_seeds, load_meta, load_data, pad_data
+from common.ml import model_input, model_output, baseline, split, mlp, cnn1, lstm, bilstm, cnn1lstm
 
 if __name__ == '__main__':
 
@@ -242,7 +17,7 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Train prediction models')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-i', '--input', help='Model input latent size', default='split', choices=['baseline', 'split'])
-    parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn1', 'cnn1m', 'lstm', 'bilstm', 'cnn1lstm', 'lstmatt'])
+    parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn1', 'lstm', 'bilstm', 'cnn1lstm'])
     parser.add_argument('-f', '--firstclasses', help='Delay class when prediction starts', type=int, nargs='+', default=[1, 2, 3, 4, 5])
     parser.add_argument('-l', '--lastclasses', help='Delay class when prediction ends', type=int, nargs='+')
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=seed)
@@ -408,7 +183,6 @@ if __name__ == '__main__':
                 stage = stages[2]
             Xi = {}
             for dc_comb in dc_combs:
-                #Xi[dc_comb] = pad_data(values_k[stage], val_features, features, classes, dc_comb)
                 Xi[dc_comb] = {}
                 Xtmp = pad_data(values_k[stage], features_selected, features, classes, dc_comb)
                 for i, fs in enumerate(features_selected):
@@ -422,7 +196,6 @@ if __name__ == '__main__':
 
                 print(f'Training new model {model_name}:')
 
-                #inputs, hidden = model_input(np.sum(nfeatures), xmin, xmax)
                 inputs, hidden = model_input(features_selected, xmin, xmax)
                 input_type = locals()[args.input]
                 hidden = input_type(hidden, nfeatures)
@@ -479,13 +252,20 @@ if __name__ == '__main__':
                     br_key: [value for value in Yi],
                 })
 
-            # calculate prediction error for each class combination
+            # inference and feature importance
 
             for dc_comb in dc_combs:
+
+                # calculate prediction error for non-permuted features of the class combination
+
                 predictions = model.predict(Xi[dc_comb])[br_key].flatten()
                 assert len(predictions) == len(Yi)
                 errors[k] = np.mean(np.abs(Yi - predictions))
                 print(f'Prediction error for combination {dc_comb}: {errors[k]}')
+
+                # calculate prediction error for features permuted
+
+
 
                 # save results
 

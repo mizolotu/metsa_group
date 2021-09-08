@@ -22,11 +22,14 @@ def run(data):
     try:
         sample = json.loads(data)
         model, dc = model_selector(sample)
-        sample = adjust_input(sample, model)
-        result = model.predict(sample)
-        key = [key for key in result.keys()][0]
-        value = result[key][0, 0].tolist()
-        result = {key: value, 'model': dc, 'status': 'ok'}
+        if model is not None:
+            sample = adjust_input(sample, model)
+            result = model.predict(sample)
+            key = [key for key in result.keys()][0]
+            value = result[key][0, 0].tolist()
+            result = {key: value, 'model': dc, 'status': 'ok'}
+        else:
+            result = {'status': 'no input data provided'}
     except:
         result = {'status': 'error'}
     return result
@@ -49,11 +52,15 @@ def get_model_selector(models):
 
     def model_selector(data):
         non_nan_keys = [key for key in data.keys() if np.isnan(data[key]) == False]
-        remaining_keys = non_nan_keys.copy()
-        for k, inputs in zip(keys, model_additional_inputs):
-            remaining_keys = [key for key in remaining_keys if key not in inputs]
-            if len(remaining_keys) == 0:
-                break
-        return models[k], k
+        if len(non_nan_keys) > 0:
+            remaining_keys = non_nan_keys.copy()
+            for k, inputs in zip(keys, model_additional_inputs):
+                remaining_keys = [key for key in remaining_keys if key not in inputs]
+                if len(remaining_keys) == 0:
+                    break
+            model = models[k]
+        else:
+            model, k = None, None
+        return model, k
 
     return model_selector
