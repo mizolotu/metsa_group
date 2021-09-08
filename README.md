@@ -42,7 +42,7 @@ az ml model register -n metsa_brp -p <path to the model, e.g. models/predict_ble
 python3 simple_endpoint_test.py
 ```
 
-### Calculate feature importance (this part is now a bit broken, need to edit)
+### Calculate feature importance (this code is now a bit broken, need to edit)
 
 1. Calculate feature correlation with the target variable:
 
