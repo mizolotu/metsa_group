@@ -18,8 +18,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-i', '--input', help='Model input latent size', default='split', choices=['baseline', 'split'])
     parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn1', 'lstm', 'bilstm', 'cnn1lstm'])
-    parser.add_argument('-f', '--firstclasses', help='Delay class when prediction starts', type=int, nargs='+', default=[1, 2, 3, 4, 5])
-    parser.add_argument('-l', '--lastclasses', help='Delay class when prediction ends', type=int, nargs='+')
+    parser.add_argument('-c', '--classes', help='Delay class when prediction starts', type=int, nargs='+', default=[1, 2, 3, 4, 5])
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=seed)
     parser.add_argument('-g', '--gpu', help='GPU to use')
     parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
@@ -36,14 +35,6 @@ if __name__ == '__main__':
         print('Baseline model will use mlp feature extractor')
     else:
         feature_extractor = args.extractor
-
-    # last class
-
-    if args.lastclasses is None:
-        lastclasses = args.firstclasses
-    else:
-        lastclasses = args.lastclasses
-    assert len(lastclasses) == len(args.firstclasses), 'The number of first classes should be equal to th number of last classes!'
 
     # number of tests
 
@@ -65,7 +56,7 @@ if __name__ == '__main__':
 
     # walk through first and last classes
 
-    for firstclass, lastclass in zip(args.firstclasses, lastclasses):
+    for delay_class in args.classes:
 
         # load meta
 
@@ -74,12 +65,10 @@ if __name__ == '__main__':
         features = meta['features']
         classes = meta['classes']
         uclasses = np.sort(np.unique(classes))
-        features_selected, feature_classes_selected = [list(item) for item in zip(*[(f, c) for f, c in zip(features, classes) if c <= lastclass])]
+        features_selected, feature_classes_selected = [list(item) for item in zip(*[(f, c) for f, c in zip(features, classes) if c <= delay_class])]
         u_feature_classes_selected = np.unique(feature_classes_selected)
-        u_classes_selected = [c for c in feature_classes_selected if c >= firstclass]
         nfeatures = []
         dcs = []
-        dc_combs = []
         tbl_dc_combs = []
         for uc in uclasses:
             dcs.extend(str(uc))
@@ -88,10 +77,9 @@ if __name__ == '__main__':
             uc_features = [f for f, c in zip(features, classes) if c == uc]
             if uc in u_feature_classes_selected:
                 nfeatures.append(len(uc_features))
-                if uc in u_classes_selected:
-                    dc_combs.append(dc_comb)
+                model_dc_comb = dc_comb
 
-        print(f'The following feature classes will be used to train the model: {dc_combs}')
+        print(f'The following feature classes will be used to train the model: {model_dc_comb}')
 
         # load data
 
@@ -99,9 +87,8 @@ if __name__ == '__main__':
 
         # model name
 
-        model_name = f'{args.input}_{feature_extractor}_{firstclass}'
-        if firstclass != lastclass:
-            model_name = '-'.join([model_name, str(lastclass)])
+        model_type = f'{args.input}_{feature_extractor}'
+        model_name = f'{model_type}_{delay_class}'
 
         # create output directories
 
@@ -129,7 +116,11 @@ if __name__ == '__main__':
 
         # prediction results
 
-        errors = np.zeros(ntests)
+        reals, errors = [], []
+        mean_errors = np.zeros(ntests)
+        min_errors = np.zeros(ntests)
+        max_errors = np.zeros(ntests)
+
         for k in range(ntests):
             print(f'Test {k + 1}/{ntests}:')
 
@@ -139,11 +130,11 @@ if __name__ == '__main__':
             inds_splitted = [[] for _ in stages]
             np.random.shuffle(inds)
             val, remaining = np.split(inds, [int(validation_share * len(inds))])
+            tr, te = np.split(remaining, [int(train_test_ratio * len(remaining))])
             if args.mode == 'production':
-                tr = remaining
+                tr = np.hstack([tr, val])
+                val = te.copy()
                 te = np.array([], dtype=int)
-            else:
-                tr, te = np.split(remaining, [int(train_test_ratio * len(remaining))])
             inds_splitted[0] = tr
             inds_splitted[1] = val
             inds_splitted[2] = te
@@ -167,10 +158,8 @@ if __name__ == '__main__':
             Xtv, Ytv = {}, {}
             for stage in stages[:-1]:
                 Xtv[stage], Ytv[stage] = {}, {}
-                Xtmp, Ytmp = [], []
-                for dc_comb in dc_combs:
-                    Xtmp.append(pad_data(values_k[stage], features_selected, features, classes, dc_comb))
-                    Ytmp.append(labels_k[stage])
+                Xtmp = pad_data(values_k[stage], features_selected, features, classes, model_dc_comb)
+                Ytmp = labels_k[stage]
                 Xtmp = np.vstack(Xtmp)
                 Ytmp = np.hstack(Ytmp)
                 for i, fs in enumerate(features_selected):
@@ -182,11 +171,9 @@ if __name__ == '__main__':
             else:
                 stage = stages[2]
             Xi = {}
-            for dc_comb in dc_combs:
-                Xi[dc_comb] = {}
-                Xtmp = pad_data(values_k[stage], features_selected, features, classes, dc_comb)
-                for i, fs in enumerate(features_selected):
-                    Xi[dc_comb][fs] = Xtmp[:, i]
+            Xtmp = pad_data(values_k[stage], features_selected, features, classes, model_dc_comb)
+            for i, fs in enumerate(features_selected):
+                Xi[fs] = Xtmp[:, i]
             Yi = labels_k[stage]
             Ti = timestamps_k[stage]
 
@@ -231,18 +218,40 @@ if __name__ == '__main__':
 
             # results tables
 
-            e_path = osp.join(results_mode_dir, prediction_errors_fname)
+            mean_e_path = osp.join(results_mode_dir, prediction_mean_errors_fname)
+            min_e_path = osp.join(results_mode_dir, prediction_min_errors_fname)
+            max_e_path = osp.join(results_mode_dir, prediction_max_errors_fname)
             r_path = osp.join(results_mode_dir, prediction_results_fname)
 
             try:
-                pe = pd.read_csv(e_path)
-            except:
-                pe = pd.DataFrame({
+                p_e_mean = pd.read_csv(mean_e_path)
+            except Exception:
+                p_e_mean = pd.DataFrame({
                     dc_combs_col_name: [comb for comb in tbl_dc_combs]
                 })
 
-            if model_name not in pe.keys():
-                pe[model_name] = [np.nan for comb in tbl_dc_combs]
+            if model_type not in p_e_mean.keys():
+                p_e_mean[model_type] = [np.nan for comb in tbl_dc_combs]
+
+            try:
+                p_e_min = pd.read_csv(min_e_path)
+            except:
+                p_e_min = pd.DataFrame({
+                    dc_combs_col_name: [comb for comb in tbl_dc_combs]
+                })
+
+            if model_type not in p_e_min.keys():
+                p_e_min[model_type] = [np.nan for comb in tbl_dc_combs]
+
+            try:
+                p_e_max = pd.read_csv(max_e_path)
+            except:
+                p_e_max = pd.DataFrame({
+                    dc_combs_col_name: [comb for comb in tbl_dc_combs]
+                })
+
+            if model_type not in p_e_max.keys():
+                p_e_max[model_type] = [np.nan for comb in tbl_dc_combs]
 
             try:
                 pr = pd.read_csv(r_path)
@@ -252,29 +261,35 @@ if __name__ == '__main__':
                     br_key: [value for value in Yi],
                 })
 
-            # inference and feature importance
+            # calculate prediction error for non-permuted features of the class combination
 
-            for dc_comb in dc_combs:
+            predictions = model.predict(Xi)[br_key].flatten()
+            assert len(predictions) == len(Yi)
 
-                # calculate prediction error for non-permuted features of the class combination
+            min_errors[k] = np.min(np.abs(Yi - predictions))
+            mean_errors[k] = np.mean(np.abs(Yi - predictions))
+            max_errors[k] = np.max(np.abs(Yi - predictions))
 
-                predictions = model.predict(Xi[dc_comb])[br_key].flatten()
-                assert len(predictions) == len(Yi)
-                errors[k] = np.mean(np.abs(Yi - predictions))
-                max_error = np.max(np.abs(Yi - predictions))
-                print(f'Mean absolute prediction error for combination {dc_comb}: {errors[k]}')
-                print(f'Max absolute prediction error for combination {dc_comb}: {max_error}')
+            errors.extend(np.abs(Yi - predictions))
+            reals.extend(Yi)
 
-                # calculate prediction error for features permuted
+            print(f'Mean absolute prediction error for combination {model_dc_comb}: {mean_errors[k]}')
+            print(f'Min absolute prediction error for combination {model_dc_comb}: {min_errors[k]}')
+            print(f'Max absolute prediction error for combination {model_dc_comb}: {max_errors[k]}')
 
-                # TO DO
+            # calculate prediction error for features permuted
 
-                # save results
+            # TO DO
 
-                assert dc_comb in tbl_dc_combs
-                idx = tbl_dc_combs.index(dc_comb)
-                pe[model_name].values[idx] = np.mean(errors[:k + 1])
-                pe.to_csv(e_path, index=None)
-                model_comb = f'{model_name}_{dc_comb}'
-                pr[model_comb] = predictions
-                pr.to_csv(r_path, index=None)
+            # save results
+
+            assert model_dc_comb in tbl_dc_combs
+            idx = tbl_dc_combs.index(model_dc_comb)
+            p_e_mean[model_type].values[idx] = np.mean(mean_errors[:k + 1])
+            p_e_mean.to_csv(mean_e_path, index=None)
+            p_e_min[model_type].values[idx] = np.mean(min_errors[:k + 1])
+            p_e_min.to_csv(min_e_path, index=None)
+            p_e_max[model_type].values[idx] = np.mean(max_errors[:k + 1])
+            p_e_max.to_csv(max_e_path, index=None)
+            pr[model_name] = predictions
+            pr.to_csv(r_path, index=None)
