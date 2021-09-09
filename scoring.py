@@ -1,4 +1,4 @@
-import os, json
+import os, json, sys
 import os.path as osp
 import numpy as np
 import tensorflow as tf
@@ -30,13 +30,16 @@ def run(data):
             result = {key: value, 'model': dc, 'status': 'ok'}
         else:
             result = {'status': 'no input data provided'}
-    except:
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        print(e, fname, exc_tb.tb_lineno)
         result = {'status': 'error'}
     return result
 
 def adjust_input(data, model):
     for key in model.input:
-        if key not in data:
+        if key not in data or data[key] is None:
             data[key] = np.array([np.nan])
         elif type(data[key]) is not list:
             data[key] = np.array([data[key]])
@@ -51,7 +54,7 @@ def get_model_selector(models):
         model_additional_inputs.append(new_tags)
 
     def model_selector(data):
-        non_nan_keys = [key for key in data.keys() if np.isnan(data[key]) == False]
+        non_nan_keys = [key for key in data.keys() if data[key] is not None and np.isnan(data[key]) == False]
         if len(non_nan_keys) > 0:
             remaining_keys = non_nan_keys.copy()
             for k, inputs in zip(keys, model_additional_inputs):

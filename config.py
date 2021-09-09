@@ -17,6 +17,7 @@ prediction_results_fname = 'prediction_results.csv'
 prediction_errors_fname = 'prediction_errors.csv'
 summary_txt = 'summary.txt'
 example_samples_fname = 'example.json'
+test_samples_fname = 'test_samples.csv'
 
 # data
 

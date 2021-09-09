@@ -261,11 +261,13 @@ if __name__ == '__main__':
                 predictions = model.predict(Xi[dc_comb])[br_key].flatten()
                 assert len(predictions) == len(Yi)
                 errors[k] = np.mean(np.abs(Yi - predictions))
-                print(f'Prediction error for combination {dc_comb}: {errors[k]}')
+                max_error = np.max(np.abs(Yi - predictions))
+                print(f'Mean absolute prediction error for combination {dc_comb}: {errors[k]}')
+                print(f'Max absolute prediction error for combination {dc_comb}: {max_error}')
 
                 # calculate prediction error for features permuted
 
-
+                # TO DO
 
                 # save results
 
