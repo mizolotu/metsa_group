@@ -227,7 +227,7 @@ if __name__ == '__main__':
 
                 model.save(m_path)
                 with open(osp.join(m_path, summary_txt), 'w') as f:
-                    tf.write(model_summary)
+                    f.write(model_summary)
 
             # results tables
 
