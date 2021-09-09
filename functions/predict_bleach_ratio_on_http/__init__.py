@@ -1,30 +1,41 @@
+import logging
 import azure.functions as func
 
-from .utils import load_columns, insert_data_row
+from .utils import select_last_prediction_row, select_last_data_rows, select_new_data_samples, prepare_samples, predict, insert_prediction_row
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
 
-    columns = load_columns('metainfo.json')
-    param_names = columns['features'] + [columns['label']] + [columns['timestamp']]
+    last_prediction_rows = select_last_prediction_row()
+    last_data_rows = select_last_data_rows()
 
-    sample = {}
-    for name in param_names:
-        value = req.params.get(name)
-        if not value:
-            try:
-                req_body = req.get_json()
-            except ValueError:
-                pass
+    if len(last_data_rows) > 0:
+        if len(last_prediction_rows) == 0:
+            rows_to_predict = [last_data_rows[0]]
+        else:
+            rows_to_predict = select_new_data_samples(last_data_rows, last_prediction_rows[0])
+
+    for row in rows_to_predict:
+
+        # predictions for each class
+
+        timestamp, samples, label = prepare_samples(row)
+        predictions, errors = [], []
+
+        logging.info(f'Real: {label}')
+
+        for sample in samples:
+            prediction, model = predict(sample)
+            predictions.append(prediction)
+            if prediction is not None and label is not None:
+                error = abs(prediction - label)
             else:
-                value = req_body.get(name)
-        if value is not None:
-            sample[name] = value
+                error = None
+            errors.append(error)
 
-    if len(sample) > 0:
-        insert_data_row(sample)
-        return func.HttpResponse(f"Data row has been inserted!")
-    else:
-        return func.HttpResponse(
-             "This HTTP triggered function executed successfully, but you have to pass some data.",
-             status_code=200
-        )
+            logging.info(f'Prediction: {prediction}, model: {model}, error: {error}')
+
+        # insert the result into table
+
+        insert_prediction_row(timestamp, label, predictions, errors)
+
+    return func.HttpResponse(f"{len(rows_to_predict)} rows have been added to the prediction table!")
