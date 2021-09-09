@@ -9,7 +9,7 @@ driver = '{ODBC Driver 17 for SQL Server}'
 data_table = 'metsa_brp_sample_data'
 prediction_table = 'metsa_brp_sample_predictions'
 username = 'jyusqlserver'
-password = '#jyusql1'
+password = ''
 
 db_connection_str = f'DRIVER={driver};SERVER={server};PORT=1433;DATABASE={database};UID={username};PWD={password}'
 params = urllib.parse.quote_plus(db_connection_str)
