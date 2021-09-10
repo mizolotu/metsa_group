@@ -226,6 +226,26 @@ if __name__ == '__main__':
                 with open(osp.join(m_path, summary_txt), 'w') as f:
                     f.write(model_summary)
 
+            # calculate prediction error for non-permuted features of the class combination
+
+            predictions = model.predict(Xi)[br_key].flatten()
+            assert len(predictions) == len(Yi)
+
+            min_errors[k] = np.min(np.abs(Yi - predictions))
+            mean_errors[k] = np.mean(np.abs(Yi - predictions))
+            max_errors[k] = np.max(np.abs(Yi - predictions))
+
+            errors.extend(np.abs(Yi - predictions))
+            reals.extend(Yi)
+
+            print(f'Mean absolute prediction error for combination {model_dc_comb}: {mean_errors[k]}')
+            print(f'Min absolute prediction error for combination {model_dc_comb}: {min_errors[k]}')
+            print(f'Max absolute prediction error for combination {model_dc_comb}: {max_errors[k]}')
+
+            # calculate prediction error for features permuted
+
+            # TO DO
+
             # results tables
 
             mean_e_path = osp.join(results_mode_dir, prediction_mean_errors_fname)
@@ -270,26 +290,6 @@ if __name__ == '__main__':
                     ts_key: [value for value in Ti],
                     br_key: [value for value in Yi],
                 })
-
-            # calculate prediction error for non-permuted features of the class combination
-
-            predictions = model.predict(Xi)[br_key].flatten()
-            assert len(predictions) == len(Yi)
-
-            min_errors[k] = np.min(np.abs(Yi - predictions))
-            mean_errors[k] = np.mean(np.abs(Yi - predictions))
-            max_errors[k] = np.max(np.abs(Yi - predictions))
-
-            errors.extend(np.abs(Yi - predictions))
-            reals.extend(Yi)
-
-            print(f'Mean absolute prediction error for combination {model_dc_comb}: {mean_errors[k]}')
-            print(f'Min absolute prediction error for combination {model_dc_comb}: {min_errors[k]}')
-            print(f'Max absolute prediction error for combination {model_dc_comb}: {max_errors[k]}')
-
-            # calculate prediction error for features permuted
-
-            # TO DO
 
             # save results
 

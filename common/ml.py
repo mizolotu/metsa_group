@@ -175,7 +175,7 @@ def bilstm_att(hidden, nhidden=640):
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
-def model_output(inputs, hidden, target, ymin, ymax, nhidden=2048, dropout=0.5, lr=2.5e-4):
+def model_output(inputs, hidden, target, ymin, ymax, nhidden=2048, dropout=0.5, lr=5e-5):
     hidden = tf.keras.layers.Dense(nhidden, activation='relu')(hidden)
     if dropout is not None:
         hidden = tf.keras.layers.Dropout(dropout)(hidden)
@@ -183,7 +183,7 @@ def model_output(inputs, hidden, target, ymin, ymax, nhidden=2048, dropout=0.5, 
     outputs = outputs * (ymax - ymin) + ymin
     outputs = {target: outputs}
     model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-    loss = tf.keras.losses.MeanAbsoluteError()
-    #loss = tf.keras.losses.MeanSquaredError()
+    #loss = tf.keras.losses.MeanAbsoluteError()
+    loss = tf.keras.losses.MeanSquaredError()
     model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
     return model
