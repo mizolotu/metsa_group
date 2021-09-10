@@ -22,7 +22,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--classes', help='Delay class when prediction starts', type=int, nargs='+', default=[1, 2, 3, 4, 5])
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=seed)
     parser.add_argument('-g', '--gpu', help='GPU to use')
-    parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
+    parser.add_argument('-v', '--verbose', help='Verbose', default=False, type=bool)
     parser.add_argument('-y', '--ylimits', help='Use bleach ratio limits from data?', default=False, type=bool)
     parser.add_argument('-r', '--retrain', help='Retrain model?', default=False, type=bool)
     parser.add_argument('-n', '--ntests', help='Number of tests', type=int, default=1)
