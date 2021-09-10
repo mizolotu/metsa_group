@@ -1,10 +1,9 @@
-import os, json, shutil
+import os, json, shutil, sys
 import argparse as arp
 import os.path as osp
-import sys
-
 import numpy as np
 import pandas as pd
+import dateutil.parser as dp
 
 from config import *
 
@@ -14,6 +13,7 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
+    parser.add_argument('-a', '--all', help='Extract all data?', type=bool, default=False)
     args = parser.parse_args()
 
     # laod delay classes
@@ -78,6 +78,14 @@ if __name__ == '__main__':
     values = values[idx, :]
     labels = labels[idx]
     timestamps = timestamps[idx]
+
+    if not args.all:
+        deltas = labels[1:] - labels[:-1]
+        idx = np.where(deltas != 0)[0] + 1
+        values = values[idx, :]
+        labels = labels[idx]
+        timestamps = timestamps[idx]
+
     print(f'Data sample timestamps are between {np.min(timestamps)} and {np.max(timestamps)}')
     print(f'Data sample labels are between {np.min(labels)} and {np.max(labels)}')
 

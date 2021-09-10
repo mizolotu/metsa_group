@@ -206,8 +206,8 @@ if __name__ == '__main__':
 
                 model.fit(
                     Xtv[stages[0]], Ytv[stages[0]],
-                    sample_weight=Wtv[stages[0]],
-                    validation_data=(Xtv[stages[1]], Ytv[stages[1]], Wtv[stages[1]]),
+                    #sample_weight=Wtv[stages[0]],
+                    validation_data=(Xtv[stages[1]], Ytv[stages[1]]),  # Wtv[stages[1]]
                     epochs=epochs,
                     verbose=args.verbose,
                     batch_size=batch_size,
