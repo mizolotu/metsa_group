@@ -183,5 +183,6 @@ def model_output(inputs, hidden, target, ymin, ymax, nhidden=2048, dropout=0.5, 
     outputs = outputs * (ymax - ymin) + ymin
     outputs = {target: outputs}
     model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-    model.compile(loss=tf.keras.losses.MeanSquaredError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
+    loss = tf.keras.losses.MeanAbsoluteError()
+    model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
     return model
