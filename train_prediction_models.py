@@ -1,4 +1,5 @@
-import os
+import os, scipy
+import scipy.stats as ss
 import os.path as osp
 
 import pandas as pd
@@ -153,18 +154,25 @@ if __name__ == '__main__':
                 ymin = br_min
                 ymax = br_max
 
+            # br ratio distribution
+
+            ymean = np.mean(labels_k[stages[0]])
+            ystd = np.std(labels_k[stages[0]])
+
             # create datasets by padding certain feature classes
 
-            Xtv, Ytv = {}, {}
+            Xtv, Wtv, Ytv = {}, {}, {}
             for stage in stages[:-1]:
-                Xtv[stage], Ytv[stage] = {}, {}
-                Xtmp = pad_data(values_k[stage], features_selected, features, classes, model_dc_comb)
-                Ytmp = labels_k[stage]
-                Xtmp = np.vstack(Xtmp)
-                Ytmp = np.hstack(Ytmp)
+                Xtv[stage], Wtv[stage], Ytv[stage] = {}, {}, {}
+                #Xtmp = pad_data(values_k[stage], features_selected, features, classes, model_dc_comb)
+                Xtmp = values_k[stage]
+                #Ytmp = labels_k[stage]
+                #Xtmp = np.vstack(Xtmp)
+                #Ytmp = np.hstack(Ytmp)
                 for i, fs in enumerate(features_selected):
                     Xtv[stage][fs] = Xtmp[:, i]
-                Ytv[stage][br_key] = Ytmp
+                Ytv[stage][br_key] = labels_k[stage]
+                Wtv[stage] = 1 / ss.norm.pdf(labels_k[stage], ymean, ystd)
 
             if args.mode == 'production':
                 stage = stages[1]
@@ -197,7 +205,8 @@ if __name__ == '__main__':
 
                 model.fit(
                     Xtv[stages[0]], Ytv[stages[0]],
-                    validation_data=(Xtv[stages[1]], Ytv[stages[1]]),
+                    sample_weight=Wtv[stages[0]],
+                    validation_data=(Xtv[stages[1]], Ytv[stages[1]], Wtv[stages[1]]),
                     epochs=epochs,
                     verbose=args.verbose,
                     batch_size=batch_size,
