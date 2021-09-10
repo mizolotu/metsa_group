@@ -2,6 +2,7 @@ import json, sqlalchemy
 import tensorflow as tf
 import numpy as np
 import pandas as pd
+import scipy.stats as ss
 
 from itertools import chain, combinations
 from config import br_key, ts_key
@@ -58,3 +59,22 @@ def select_last_data_rows(db_connection, table_pointer, timestamp_column, n=10):
     sel = table_pointer.select(limit=n, order_by=sqlalchemy.Column(timestamp_column).desc())
     result = db_connection.execute(sel)
     return [dict(row) for row in result.fetchall()]
+
+def get_best_distribution(data, distributions = ["norm", "exponweib", "weibull_max", "weibull_min", "pareto", "genextreme"]):
+    dist_results = []
+    params = {}
+    for distribution in distributions:
+        dist = getattr(ss, distribution)
+        param = dist.fit(data)
+
+        params[distribution] = param
+        D, p = ss.kstest(data, distribution, args=param)
+        dist_results.append((distribution, p))
+
+    best_dist, best_p = (max(dist_results, key=lambda item: item[1]))
+
+    print("Best fitting distribution: "+str(best_dist))
+    print("Best p value: "+ str(best_p))
+    print("Parameters for the best fit: "+ str(params[best_dist]))
+
+    return best_dist, best_p, params[best_dist]

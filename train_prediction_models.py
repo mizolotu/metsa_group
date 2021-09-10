@@ -1,4 +1,4 @@
-import os, scipy
+import os
 import scipy.stats as ss
 import os.path as osp
 
@@ -8,7 +8,7 @@ import numpy as np
 import argparse as arp
 
 from config import *
-from common.utils import set_seeds, load_meta, load_data, pad_data
+from common.utils import set_seeds, load_meta, load_data, pad_data, get_best_distribution
 from common.ml import model_input, model_output, baseline, split, mlp, cnn1, lstm, bilstm, cnn1lstm
 
 if __name__ == '__main__':
@@ -158,6 +158,7 @@ if __name__ == '__main__':
 
             ymean = np.mean(labels_k[stages[0]])
             ystd = np.std(labels_k[stages[0]])
+            y_prob_thr = ss.norm.pdf(ymean + 5 * ystd, ymean, ystd)
 
             # create datasets by padding certain feature classes
 
@@ -172,7 +173,7 @@ if __name__ == '__main__':
                 for i, fs in enumerate(features_selected):
                     Xtv[stage][fs] = Xtmp[:, i]
                 Ytv[stage][br_key] = labels_k[stage]
-                Wtv[stage] = 1 / ss.norm.pdf(labels_k[stage], ymean, ystd)
+                Wtv[stage] = 1 / np.clip(ss.norm.pdf(labels_k[stage], ymean, ystd), y_prob_thr, np.inf)
 
             if args.mode == 'production':
                 stage = stages[1]
