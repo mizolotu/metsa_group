@@ -3,7 +3,7 @@ import numpy as np
 
 from config import nan_value
 
-def model_input(features, xmin, xmax, batchnorm=False, eps=1e-10):
+def model_input(features, xmin, xmax, batchnorm=True, eps=1e-10):
 
     # input layer
 
