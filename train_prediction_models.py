@@ -210,7 +210,7 @@ if __name__ == '__main__':
                     validation_data=(Xtv[stages[1]], Ytv[stages[1]]),  # Wtv[stages[1]]
                     epochs=epochs,
                     verbose=args.verbose,
-                    batch_size=batch_size,
+                    #batch_size=batch_size,
                     callbacks=[tf.keras.callbacks.EarlyStopping(
                         monitor='val_loss',
                         verbose=False,
