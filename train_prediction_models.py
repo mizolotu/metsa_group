@@ -203,6 +203,8 @@ if __name__ == '__main__':
                 model_summary = "\n".join(model_summary_lines)
                 if args.verbose and k == 0:
                     print(model_summary)
+                
+                print([Xtv[stages[0]][key][0] for key in Xtv[stages[0]].keys()])
 
                 model.fit(
                     Xtv[stages[0]], Ytv[stages[0]],
