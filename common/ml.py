@@ -3,7 +3,7 @@ import numpy as np
 
 from config import nan_value
 
-def model_input(features, xmin, xmax, batchnorm=True, eps=1e-10):
+def model_input(features, xmin, xmax, batchnorm=False, eps=1e-10):
 
     # input layer
 
@@ -175,7 +175,7 @@ def bilstm_att(hidden, nhidden=640):
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
-def model_output(inputs, hidden, target, ymin, ymax, nhidden=2048, dropout=0.0, lr=5e-5):
+def model_output(inputs, hidden, target, ymin, ymax, nhidden=2048, dropout=0.5, lr=5e-5):
     hidden = tf.keras.layers.Dense(nhidden, activation='relu')(hidden)
     if dropout is not None:
         hidden = tf.keras.layers.Dropout(dropout)(hidden)
