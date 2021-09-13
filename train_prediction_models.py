@@ -51,13 +51,13 @@ if __name__ == '__main__':
     else:
         os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
-    # set seed for results reproduction
-
-    set_seeds(args.seed)
-
     # walk through first and last classes
 
     for delay_class in args.classes:
+
+        # set seed for results reproduction
+
+        set_seeds(args.seed)
 
         # load meta
 
