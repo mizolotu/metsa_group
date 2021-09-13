@@ -203,7 +203,7 @@ if __name__ == '__main__':
                 model_summary = "\n".join(model_summary_lines)
                 if args.verbose and k == 0:
                     print(model_summary)
-
+                print(len(Ytv[stages[0]]))
                 model.fit(
                     Xtv[stages[0]], Ytv[stages[0]],
                     #sample_weight=Wtv[stages[0]],
