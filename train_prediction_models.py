@@ -234,6 +234,8 @@ if __name__ == '__main__':
             min_errors[k] = np.min(np.abs(Yi - predictions))
             mean_errors[k] = np.mean(np.abs(Yi - predictions))
             max_errors[k] = np.max(np.abs(Yi - predictions))
+            max_i = np.argmax(np.abs(Yi - predictions))
+            print(f'Max error prediction: {predictions[max_i]}, the real value: {Yi[max_i]}')
 
             errors.extend(np.abs(Yi - predictions))
             reals.extend(Yi)
