@@ -87,7 +87,10 @@ if __name__ == '__main__':
         timestamps = timestamps[idx]
 
     print(f'Data sample timestamps are between {np.min(timestamps)} and {np.max(timestamps)}')
-    print(f'Data sample labels are between {np.min(labels)} and {np.max(labels)}')
+    print(f'Number of samples with label in interval [{np.min(labels)}, {br_min}): {len(np.where(labels < br_min)[0])}')
+    print(f'Number of samples with label in interval [{br_min}, {br_max}): {len(np.where((labels >= br_min) & (labels <= br_max))[0])}')
+    print(f'Number of samples with label in interval [{br_max}, {np.max(labels)}): {len(np.where(labels > br_max)[0])}')
+
 
     # sort features
 
