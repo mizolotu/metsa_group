@@ -103,7 +103,8 @@ if __name__ == '__main__':
         m_path = osp.join(task_models_dir, args.mode, model_name)
         task_results_dir = osp.join(results_dir, args.task)
         results_mode_dir = osp.join(task_results_dir, args.mode)
-        for d in [models_dir, task_models_dir, model_mode_dir, m_path, results_dir, task_results_dir, results_mode_dir]:
+        task_figures_dir = osp.join(figures_dir, args.task)
+        for d in [models_dir, task_models_dir, model_mode_dir, m_path, results_dir, task_results_dir, results_mode_dir, task_figures_dir]:
             if not osp.isdir(d):
                 os.mkdir(d)
 
@@ -315,5 +316,5 @@ if __name__ == '__main__':
 
         reals, idx = np.unique(reals, return_index=True)
         errors = [errors[i] for i in idx]
-        fpath = osp.join(figures_dir, args.task, f'{model_name}_{error_for_real_fname}')
+        fpath = osp.join(task_figures_dir, f'{model_name}_{error_for_real_fname}')
         plot_line(reals, errors, 'ko', br_key, 'Prediction error', fpath)
