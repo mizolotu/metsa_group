@@ -20,6 +20,8 @@ prediction_max_errors_fname = 'prediction_max_errors.csv'
 summary_txt = 'summary.txt'
 example_samples_fname = 'example.json'
 test_samples_fname = 'test_samples.csv'
+error_cdf_fname = 'error_cdf.pdf'
+error_for_real_fname = 'error_for_real.pdf'
 
 # data
 
