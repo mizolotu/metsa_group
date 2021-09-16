@@ -180,6 +180,7 @@ if __name__ == '__main__':
                     Xtv[stage][fs] = Xtmp[:, i]
                 Ytv[stage][br_key] = labels_k[stage]
                 Wtv[stage] = 1 / np.clip(ss.norm.pdf(labels_k[stage], ymean, ystd) ** 2, y_prob_thr ** 2, np.inf)
+                print(np.min(Wtv[stage]), np.max(Wtv[stage]))
 
             if args.mode == 'production':
                 stage = stages[1]
