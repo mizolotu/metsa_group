@@ -87,10 +87,7 @@ if __name__ == '__main__':
         # load data
 
         values, labels, timestamps = load_data(osp.join(task_dir, features_fname), features_selected)
-        if args.outliers:
-            idx = np.where((labels >= br_min) & (labels <= br_max))[0]
-            values, labels, timestamps = values[idx, :], labels[idx], timestamps[idx]
-
+        
         # model name
 
         model_type = f'{args.input}_{feature_extractor}_{args.weight}'
