@@ -162,9 +162,12 @@ if __name__ == '__main__':
 
             # br ratio distribution
 
+            ymin = np.min(labels_k[stages[0]])
+            ymax = np.max(labels_k[stages[0]])
             ymean = np.mean(labels_k[stages[0]])
             ystd = np.std(labels_k[stages[0]])
-            y_prob_thr = ss.norm.pdf(ymean + 5 * ystd, ymean, ystd)
+            y_prob_thr = ss.norm.pdf(ymean + ystd, ymean, ystd)
+            print(ss.norm.pdf(ymin, ymean, ystd), ss.norm.pdf(ymax, ymean, ystd))
 
             # create datasets by padding certain feature classes
 
