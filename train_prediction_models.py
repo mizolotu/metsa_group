@@ -28,7 +28,7 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--retrain', help='Retrain model?', default=False, type=bool)
     parser.add_argument('-n', '--ntests', help='Number of tests', type=int, default=1)
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=modes)
-    parser.add_argument('-o', '--outliers', help='Exclude outliers?', default=False, type=bool)
+    parser.add_argument('-w', '--weight', help='Error weights coefficient', default=0, type=float)
     args = parser.parse_args()
 
     # model input layer
@@ -93,7 +93,7 @@ if __name__ == '__main__':
 
         # model name
 
-        model_type = f'{args.input}_{feature_extractor}'
+        model_type = f'{args.input}_{feature_extractor}_{args.weight}'
         model_name = f'{model_type}_{delay_class}'
 
         # create output directories
@@ -162,12 +162,9 @@ if __name__ == '__main__':
 
             # br ratio distribution
 
-            ymin = np.min(labels_k[stages[0]])
-            ymax = np.max(labels_k[stages[0]])
             ymean = np.mean(labels_k[stages[0]])
             ystd = np.std(labels_k[stages[0]])
-            y_prob_thr = ss.norm.pdf(ymean + ystd, ymean, ystd)
-            print(ss.norm.pdf(ymin, ymean, ystd), ss.norm.pdf(ymax, ymean, ystd))
+            y_prob_thr = ss.norm.pdf(ymean + args.weight * ystd, ymean, ystd)
 
             # create datasets by padding certain feature classes
 
