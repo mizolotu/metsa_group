@@ -322,5 +322,5 @@ if __name__ == '__main__':
         p_e_max[model_type].values[idx] = np.mean(max_errors)
         p_e_max.to_csv(max_e_path, index=None)
 
-        pr[model_name] = predictions
+        pr[model_name] = preds
         pr.to_csv(r_path, index=None)
