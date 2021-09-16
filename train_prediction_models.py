@@ -19,7 +19,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-i', '--input', help='Model input latent size', default='split', choices=['baseline', 'split'])
     parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn1', 'lstm', 'bilstm', 'cnn1lstm'])
-    parser.add_argument('-c', '--classes', help='Delay class when prediction starts', type=int, nargs='+', default=[1, 2, 3, 4, 5])
+    parser.add_argument('-c', '--classes', help='Delay class when prediction starts', type=int, nargs='+', default=[4, 5])
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=seed)
     parser.add_argument('-g', '--gpu', help='GPU to use')
     parser.add_argument('-v', '--verbose', help='Verbose', default=False, type=bool)
@@ -27,6 +27,7 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--retrain', help='Retrain model?', default=False, type=bool)
     parser.add_argument('-n', '--ntests', help='Number of tests', type=int, default=1)
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=modes)
+    parser.add_argument('-o', '--outliers', help='Exclude outliers?', default=False, type=bool)
     args = parser.parse_args()
 
     # model input layer
@@ -85,6 +86,9 @@ if __name__ == '__main__':
         # load data
 
         values, labels, timestamps = load_data(osp.join(task_dir, features_fname), features_selected)
+        if args.outliers:
+            idx = np.where((labels >= br_min) & (labels <= br_max))[0]
+            values, labels, timestamps = values[idx, :], labels[idx], timestamps[idx]
 
         # model name
 
