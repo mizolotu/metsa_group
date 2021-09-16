@@ -298,11 +298,6 @@ if __name__ == '__main__':
                     br_key: [value for value in Yi],
                 })
 
-            # plot errors
-
-            fpath = osp.join(figures_dir, task_dir, f'{model_name}_{error_for_real_fname}')
-            plot_line(reals, errors, 'ko', br_key, 'Prediction error', fpath)
-
             # save results
 
             assert model_dc_comb in tbl_dc_combs
@@ -315,3 +310,10 @@ if __name__ == '__main__':
             p_e_max.to_csv(max_e_path, index=None)
             pr[model_name] = predictions
             pr.to_csv(r_path, index=None)
+
+        # plot errors
+
+        reals, idx = np.unique(reals, return_index=True)
+        errors = [errors[i] for i in idx]
+        fpath = osp.join(figures_dir, task_dir, f'{model_name}_{error_for_real_fname}')
+        plot_line(reals, errors, 'ko', br_key, 'Prediction error', fpath)
