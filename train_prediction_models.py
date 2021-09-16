@@ -164,7 +164,7 @@ if __name__ == '__main__':
 
             ymean = np.mean(labels_k[stages[0]])
             ystd = np.std(labels_k[stages[0]])
-            y_prob_thr = ss.norm.pdf(ymean + 3 * ystd, ymean, ystd)
+            y_prob_thr = ss.norm.pdf(ymean + 5 * ystd, ymean, ystd)
 
             # create datasets by padding certain feature classes
 
