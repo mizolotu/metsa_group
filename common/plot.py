@@ -1,7 +1,6 @@
 from matplotlib import pyplot as pp
-from itertools import cycle
 
-def plot_markers(x, y, marker, xlabel, ylabel, fpath):
+def plot_line(x, y, marker, xlabel, ylabel, fpath):
     pp.figure(figsize=(16, 12))
     pp.plot(x, y, marker)
     pp.xlabel(xlabel, fontdict={'size': 12})
