@@ -315,5 +315,5 @@ if __name__ == '__main__':
 
         reals, idx = np.unique(reals, return_index=True)
         errors = [errors[i] for i in idx]
-        fpath = osp.join(figures_dir, task_dir, f'{model_name}_{error_for_real_fname}')
+        fpath = osp.join(figures_dir, args.task, f'{model_name}_{error_for_real_fname}')
         plot_line(reals, errors, 'ko', br_key, 'Prediction error', fpath)
