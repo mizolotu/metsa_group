@@ -175,7 +175,7 @@ def bilstm_att(hidden, nhidden=640):
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
-def model_output(inputs, hidden, target, ymin, ymax, nhidden=2048, dropout=0.5, lr=1e-5, eps=1e-8):
+def model_output(inputs, hidden, target, ymin, ymax, nhidden=2048, dropout=0.5, lr=1e-6, eps=1e-8):
     hidden = tf.keras.layers.Dense(nhidden, activation='relu')(hidden)
     if dropout is not None:
         hidden = tf.keras.layers.Dropout(dropout)(hidden)

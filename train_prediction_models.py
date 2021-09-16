@@ -10,6 +10,7 @@ import argparse as arp
 from config import *
 from common.utils import set_seeds, load_meta, load_data, pad_data, get_best_distribution
 from common.ml import model_input, model_output, baseline, split, mlp, cnn1, lstm, bilstm, cnn1lstm
+from common.plot import plot_line
 
 if __name__ == '__main__':
 
@@ -296,6 +297,11 @@ if __name__ == '__main__':
                     ts_key: [value for value in Ti],
                     br_key: [value for value in Yi],
                 })
+
+            # plot errors
+
+            fpath = osp.join(figures_dir, f'{model_name}_{error_for_real_fname}')
+            plot_line(reals, errors, 'ko', br_key, 'Prediction error', fpath)
 
             # save results
 
