@@ -123,7 +123,7 @@ if __name__ == '__main__':
 
         # prediction results
 
-        reals, errors, tsteps = [], [], []
+        reals, preds, errors, tsteps = [], [], [], []
         mean_errors = np.zeros(ntests)
         min_errors = np.zeros(ntests)
         max_errors = np.zeros(ntests)
@@ -246,6 +246,7 @@ if __name__ == '__main__':
             errors.extend(np.abs(Yi - predictions))
             reals.extend(Yi)
             tsteps.extend(Ti)
+            preds.extend(predictions)
 
             print(f'Mean absolute prediction error for combination {model_dc_comb}: {mean_errors[k]}')
             print(f'Min absolute prediction error for combination {model_dc_comb}: {min_errors[k]}')
@@ -258,6 +259,7 @@ if __name__ == '__main__':
         # plot errors
 
         reals, idx = np.unique(reals, return_index=True)
+        preds = [preds[i] for i in idx]
         errors = [errors[i] for i in idx]
         tsteps = [tsteps[i] for i in idx]
         fpath = osp.join(task_figures_dir, f'{model_name}_{error_for_real_fname}')
