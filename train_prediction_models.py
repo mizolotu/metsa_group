@@ -123,7 +123,7 @@ if __name__ == '__main__':
 
         # prediction results
 
-        reals, errors = [], []
+        reals, errors, tsteps = [], [], []
         mean_errors = np.zeros(ntests)
         min_errors = np.zeros(ntests)
         max_errors = np.zeros(ntests)
@@ -245,6 +245,7 @@ if __name__ == '__main__':
 
             errors.extend(np.abs(Yi - predictions))
             reals.extend(Yi)
+            tsteps.extend(Ti)
 
             print(f'Mean absolute prediction error for combination {model_dc_comb}: {mean_errors[k]}')
             print(f'Min absolute prediction error for combination {model_dc_comb}: {min_errors[k]}')
@@ -254,67 +255,70 @@ if __name__ == '__main__':
 
             # TO DO
 
-            # results tables
-
-            mean_e_path = osp.join(results_mode_dir, prediction_mean_errors_fname)
-            min_e_path = osp.join(results_mode_dir, prediction_min_errors_fname)
-            max_e_path = osp.join(results_mode_dir, prediction_max_errors_fname)
-            r_path = osp.join(results_mode_dir, prediction_results_fname)
-
-            try:
-                p_e_mean = pd.read_csv(mean_e_path)
-            except Exception:
-                p_e_mean = pd.DataFrame({
-                    dc_combs_col_name: [comb for comb in tbl_dc_combs]
-                })
-
-            if model_type not in p_e_mean.keys():
-                p_e_mean[model_type] = [np.nan for comb in tbl_dc_combs]
-
-            try:
-                p_e_min = pd.read_csv(min_e_path)
-            except:
-                p_e_min = pd.DataFrame({
-                    dc_combs_col_name: [comb for comb in tbl_dc_combs]
-                })
-
-            if model_type not in p_e_min.keys():
-                p_e_min[model_type] = [np.nan for comb in tbl_dc_combs]
-
-            try:
-                p_e_max = pd.read_csv(max_e_path)
-            except:
-                p_e_max = pd.DataFrame({
-                    dc_combs_col_name: [comb for comb in tbl_dc_combs]
-                })
-
-            if model_type not in p_e_max.keys():
-                p_e_max[model_type] = [np.nan for comb in tbl_dc_combs]
-
-            try:
-                pr = pd.read_csv(r_path)
-            except:
-                pr = pd.DataFrame({
-                    ts_key: [value for value in Ti],
-                    br_key: [value for value in Yi],
-                })
-
-            # save results
-
-            assert model_dc_comb in tbl_dc_combs
-            idx = tbl_dc_combs.index(model_dc_comb)
-            p_e_mean[model_type].values[idx] = np.mean(mean_errors[:k + 1])
-            p_e_mean.to_csv(mean_e_path, index=None)
-            p_e_min[model_type].values[idx] = np.mean(min_errors[:k + 1])
-            p_e_min.to_csv(min_e_path, index=None)
-            p_e_max[model_type].values[idx] = np.mean(max_errors[:k + 1])
-            p_e_max.to_csv(max_e_path, index=None)
-            pr[model_name] = predictions
-            pr.to_csv(r_path, index=None)
-
         # plot errors
 
         reals, idx = np.unique(reals, return_index=True)
         errors = [errors[i] for i in idx]
-        fpath = osp.join(task_figures_dir, f'{model_name}_{error_for_real_fname}')
+        tsteps = [tsteps[i] for i in idx]
+        fpath = osp.join(task_figures_dir, f'{error_for_real_fname}_{model_name}')
         plot_line(reals, errors, 'ko', br_key, 'Prediction error', fpath)
+
+        # results tables
+
+        mean_e_path = osp.join(results_mode_dir, prediction_mean_errors_fname)
+        min_e_path = osp.join(results_mode_dir, prediction_min_errors_fname)
+        max_e_path = osp.join(results_mode_dir, prediction_max_errors_fname)
+        r_path = osp.join(results_mode_dir, prediction_results_fname)
+
+        try:
+            p_e_mean = pd.read_csv(mean_e_path)
+        except Exception:
+            p_e_mean = pd.DataFrame({
+                dc_combs_col_name: [comb for comb in tbl_dc_combs]
+            })
+
+        if model_type not in p_e_mean.keys():
+            p_e_mean[model_type] = [np.nan for comb in tbl_dc_combs]
+
+        try:
+            p_e_min = pd.read_csv(min_e_path)
+        except:
+            p_e_min = pd.DataFrame({
+                dc_combs_col_name: [comb for comb in tbl_dc_combs]
+            })
+
+        if model_type not in p_e_min.keys():
+            p_e_min[model_type] = [np.nan for comb in tbl_dc_combs]
+
+        try:
+            p_e_max = pd.read_csv(max_e_path)
+        except:
+            p_e_max = pd.DataFrame({
+                dc_combs_col_name: [comb for comb in tbl_dc_combs]
+            })
+
+        if model_type not in p_e_max.keys():
+            p_e_max[model_type] = [np.nan for comb in tbl_dc_combs]
+
+        try:
+            pr = pd.read_csv(r_path)
+            assert pr.shape[0] == len(tsteps), 'The dataset size has changed, the statistics table will be rewritten!'
+        except:
+            pr = pd.DataFrame({
+                ts_key: [value for value in tsteps],
+                br_key: [value for value in reals],
+            })
+
+        # save results
+
+        assert model_dc_comb in tbl_dc_combs
+        idx = tbl_dc_combs.index(model_dc_comb)
+        p_e_mean[model_type].values[idx] = np.mean(mean_errors)
+        p_e_mean.to_csv(mean_e_path, index=None)
+        p_e_min[model_type].values[idx] = np.mean(min_errors)
+        p_e_min.to_csv(min_e_path, index=None)
+        p_e_max[model_type].values[idx] = np.mean(max_errors)
+        p_e_max.to_csv(max_e_path, index=None)
+
+        pr[model_name] = predictions
+        pr.to_csv(r_path, index=None)
