@@ -164,7 +164,7 @@ if __name__ == '__main__':
 
             ymean = np.mean(labels_k[stages[0]])
             ystd = np.std(labels_k[stages[0]])
-            y_prob_thr = ss.norm.pdf(ymean + 5 * ystd, ymean, ystd)
+            y_prob_thr = ss.norm.pdf(ymean + 3 * ystd, ymean, ystd)
 
             # create datasets by padding certain feature classes
 
@@ -179,7 +179,7 @@ if __name__ == '__main__':
                 for i, fs in enumerate(features_selected):
                     Xtv[stage][fs] = Xtmp[:, i]
                 Ytv[stage][br_key] = labels_k[stage]
-                Wtv[stage] = 1 / np.clip(ss.norm.pdf(labels_k[stage], ymean, ystd) ** 2, y_prob_thr ** 2, np.inf)
+                Wtv[stage] = 1 / np.clip(ss.norm.pdf(labels_k[stage], ymean, ystd), y_prob_thr, np.inf)
                 Wtv[stage] /= np.sum(Wtv[stage])
                 print(Ytv[stage][br_key][np.argmin(Wtv[stage])], Wtv[stage][np.argmin(Wtv[stage])], Ytv[stage][br_key][np.argmax(Wtv[stage])], Wtv[stage][np.argmax(Wtv[stage])])
 
@@ -214,8 +214,8 @@ if __name__ == '__main__':
 
                 model.fit(
                     Xtv[stages[0]], Ytv[stages[0]],
-                    #sample_weight=Wtv[stages[0]],
-                    validation_data=(Xtv[stages[1]], Ytv[stages[1]]),  # Wtv[stages[1]]
+                    sample_weight=Wtv[stages[0]],
+                    validation_data=(Xtv[stages[1]], Ytv[stages[1]], Wtv[stages[1]]),  # Wtv[stages[1]]
                     epochs=epochs,
                     verbose=args.verbose,
                     batch_size=batch_size,
