@@ -75,6 +75,7 @@ if __name__ == '__main__':
     labels = labels[idx]
     timestamps = timestamps[idx]
     idx = np.where((pd.isna(labels) == False) & (labels > br_thr))[0]
+    print(dp.parse(timestamps[idx[0]]))
     values = values[idx, :]
     labels = labels[idx]
     timestamps = timestamps[idx]
