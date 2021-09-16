@@ -164,7 +164,7 @@ if __name__ == '__main__':
 
             ymean = np.mean(labels_k[stages[0]])
             ystd = np.std(labels_k[stages[0]])
-            y_prob_thr = ss.norm.pdf(ymean + 3 * ystd, ymean, ystd)
+            y_prob_thr = ss.norm.pdf(ymean + 5 * ystd, ymean, ystd)
 
             # create datasets by padding certain feature classes
 
@@ -180,7 +180,8 @@ if __name__ == '__main__':
                     Xtv[stage][fs] = Xtmp[:, i]
                 Ytv[stage][br_key] = labels_k[stage]
                 Wtv[stage] = 1 / np.clip(ss.norm.pdf(labels_k[stage], ymean, ystd) ** 2, y_prob_thr ** 2, np.inf)
-                print(np.min(Wtv[stage]), np.max(Wtv[stage]))
+                Wtv[stage] /= np.sum(Wtv[stage])
+                print(Ytv[stage][br_key][np.argmin(Wtv[stage])], Wtv[stage][np.argmin(Wtv[stage])], Ytv[stage][br_key][np.argmax(Wtv[stage])], Wtv[stage][np.argmax(Wtv[stage])])
 
             if args.mode == 'production':
                 stage = stages[1]
