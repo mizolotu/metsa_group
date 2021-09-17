@@ -60,7 +60,7 @@ def select_last_data_rows(db_connection, table_pointer, timestamp_column, n=10):
     result = db_connection.execute(sel)
     return [dict(row) for row in result.fetchall()]
 
-def get_best_distribution(data, distributions = ["norm", "exponweib", "weibull_max", "weibull_min", "pareto", "genextreme"]):
+def get_best_distribution(data, distributions = ['norm', 'exponweib', 'weibull_max', 'weibull_min', 'pareto', 'genextreme']):
     dist_results = []
     params = {}
     for distribution in distributions:
@@ -72,9 +72,13 @@ def get_best_distribution(data, distributions = ["norm", "exponweib", "weibull_m
         dist_results.append((distribution, p))
 
     best_dist, best_p = (max(dist_results, key=lambda item: item[1]))
-
-    print("Best fitting distribution: "+str(best_dist))
-    print("Best p value: "+ str(best_p))
-    print("Parameters for the best fit: "+ str(params[best_dist]))
-
     return best_dist, best_p, params[best_dist]
+
+def interpolate(x, xp, yp):
+    y_interpolated = np.nan * np.ones((len(x), yp.shape[1]))
+    for i in range(yp.shape[1]):
+        col = yp[:, i]
+        idx = np.where(np.isnan(col) == False)[0]
+        if len(idx) > 0:
+            y_interpolated[:, i] = np.interp(x, xp[idx], yp[idx, i])
+    return y_interpolated

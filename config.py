@@ -44,6 +44,7 @@ seed = 0
 batch_size = 64
 epochs = 10000
 patience = 100
+series_len = 64
 
 # azure
 

@@ -6,6 +6,7 @@ import pandas as pd
 import dateutil.parser as dp
 
 from config import *
+from common.utils import interpolate
 
 if __name__ == '__main__':
 
@@ -13,7 +14,7 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-a', '--all', help='Extract all data?', type=bool, default=False)
+    parser.add_argument('-s', '--series', help='Extract as timeseries?', type=bool, default=False)
     args = parser.parse_args()
 
     # laod delay classes
@@ -75,17 +76,23 @@ if __name__ == '__main__':
     labels = labels[idx]
     timestamps = timestamps[idx]
     idx = np.where((pd.isna(labels) == False) & (labels > br_thr))[0]
-    print(dp.parse(timestamps[idx[0]]))
     values = values[idx, :]
     labels = labels[idx]
     timestamps = timestamps[idx]
 
-    if not args.all:
+    if args.series:
+        ts = np.array([dp.parse(item).timestamp() for item in timestamps])
         deltas = labels[1:] - labels[:-1]
         idx = np.where(deltas != 0)[0] + 1
-        values = values[idx, :]
+        series = np.zeros((len(idx), series_len, values.shape[1]))
+        for i, id in enumerate(idx):
+            t = ts[id]
+            t_idx = np.where((ts > (t - series_len * 60)) & (ts <= t))[0]
+            t_deltas = t - ts[t_idx]
+            series[i, :, :] = interpolate(np.arange(series_len) * 60, )
         labels = labels[idx]
         timestamps = timestamps[idx]
+
 
     print(f'Data sample timestamps are between {np.min(timestamps)} and {np.max(timestamps)}')
     print(f'Number of samples with label in interval [{np.min(labels)}, {br_min}): {len(np.where(labels < br_min)[0])}')
