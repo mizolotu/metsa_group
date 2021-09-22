@@ -10,7 +10,6 @@ import argparse as arp
 from config import *
 from common.utils import set_seeds, load_meta, load_data, pad_data, get_best_distribution
 from common.ml import model_input, model_output, baseline, split, mlp, cnn1, lstm, bilstm, cnn1lstm
-from common.plot import plot_line
 
 if __name__ == '__main__':
 
@@ -28,7 +27,6 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--retrain', help='Retrain model?', default=False, type=bool)
     parser.add_argument('-n', '--ntests', help='Number of tests', type=int, default=1)
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=modes)
-    parser.add_argument('-w', '--weight', help='Error weights coefficient', default=0, type=float)
     args = parser.parse_args()
 
     # model input layer
@@ -87,10 +85,14 @@ if __name__ == '__main__':
         # load data
 
         values, labels, timestamps = load_data(osp.join(task_dir, features_fname), features_selected)
+        if values.shape[1] == len(features_selected):
+            pass
+        elif values.shape[1] == len(features_selected) * series_len:
+            values = values.reshape(values.shape[0], series_len, len(features_selected))
 
         # model name
 
-        model_type = f'{args.input}_{feature_extractor}_{args.weight}'
+        model_type = f'{args.input}_{feature_extractor}'
         model_name = f'{model_type}_{delay_class}'
 
         # create output directories
@@ -148,8 +150,15 @@ if __name__ == '__main__':
 
             # standardization coefficients
 
-            xmin = np.nanmin(values_k[stages[0]], axis=0)[:np.sum(nfeatures)]
-            xmax = np.nanmax(values_k[stages[0]], axis=0)[:np.sum(nfeatures)]
+            if len(values_k[stages[0]].shape) == 2:
+                xmin = np.nanmin(values_k[stages[0]], axis=0)[:np.sum(nfeatures)]
+                xmax = np.nanmax(values_k[stages[0]], axis=0)[:np.sum(nfeatures)]
+            elif len(values_k[stages[0]].shape) == 3:
+            #    xmin = np.nanmin(values_k[stages[0]][:, -1, :], axis=0)[:np.sum(nfeatures)]
+            #    xmax = np.nanmax(values_k[stages[0]][:, -1, :], axis=0)[:np.sum(nfeatures)]
+                xmin = np.nanmin(values_k[stages[0]], axis=0)[:, :np.sum(nfeatures)]
+                xmax = np.nanmax(values_k[stages[0]], axis=0)[:, :np.sum(nfeatures)]
+
             if args.ylimits:
                 ymin = np.nanmin(labels_k[stages[0]])
                 ymax = np.nanmax(labels_k[stages[0]])
@@ -157,37 +166,39 @@ if __name__ == '__main__':
                 ymin = br_min
                 ymax = br_max
 
-            # br ratio distribution
-
-            ymean = np.mean(labels_k[stages[0]])
-            ystd = np.std(labels_k[stages[0]])
-            y_prob_thr = ss.norm.pdf(ymean + args.weight * ystd, ymean, ystd)
-
             # create datasets by padding certain feature classes
 
-            Xtv, Wtv, Ytv = {}, {}, {}
+            Xtv, Ytv = {}, {}
             for stage in stages[:-1]:
-                Xtv[stage], Wtv[stage], Ytv[stage] = {}, {}, {}
+                Xtv[stage], Ytv[stage] = {}, {}
                 #Xtmp = pad_data(values_k[stage], features_selected, features, classes, model_dc_comb)
                 Xtmp = values_k[stage]
                 #Ytmp = labels_k[stage]
                 #Xtmp = np.vstack(Xtmp)
                 #Ytmp = np.hstack(Ytmp)
-                for i, fs in enumerate(features_selected):
-                    Xtv[stage][fs] = Xtmp[:, i]
+                if len(Xtmp.shape) == 2:
+                    for i, fs in enumerate(features_selected):
+                        Xtv[stage][fs] = Xtmp[:, i]
+                elif len(Xtmp.shape) == 3:
+                    for i, fs in enumerate(features_selected):
+                        Xtv[stage][fs] = Xtmp[:, :, i]
                 Ytv[stage][br_key] = labels_k[stage]
-                Wtv[stage] = 1 / np.clip(ss.norm.pdf(labels_k[stage], ymean, ystd), y_prob_thr, np.inf)
-                Wtv[stage] /= np.sum(Wtv[stage])
-                print(Ytv[stage][br_key][np.argmin(Wtv[stage])], Wtv[stage][np.argmin(Wtv[stage])], Ytv[stage][br_key][np.argmax(Wtv[stage])], Wtv[stage][np.argmax(Wtv[stage])])
 
             if args.mode == 'production':
                 stage = stages[1]
             else:
                 stage = stages[2]
+
             Xi = {}
             Xtmp = pad_data(values_k[stage], features_selected, features, classes, model_dc_comb)
-            for i, fs in enumerate(features_selected):
-                Xi[fs] = Xtmp[:, i]
+            if len(Xtmp.shape) == 2:
+                steps = 1
+                for i, fs in enumerate(features_selected):
+                    Xi[fs] = Xtmp[:, i]
+            elif len(Xtmp.shape) == 3:
+                steps = series_len
+                for i, fs in enumerate(features_selected):
+                    Xi[fs] = Xtmp[:, :, i]
             Yi = labels_k[stage]
             Ti = timestamps_k[stage]
 
@@ -197,7 +208,7 @@ if __name__ == '__main__':
 
                 print(f'Training new model {model_name}:')
 
-                inputs, hidden = model_input(features_selected, xmin, xmax)
+                inputs, hidden = model_input(features_selected, steps, xmin, xmax)
                 input_type = locals()[args.input]
                 hidden = input_type(hidden, nfeatures)
                 extractor_type = locals()[feature_extractor]
@@ -211,8 +222,7 @@ if __name__ == '__main__':
 
                 model.fit(
                     Xtv[stages[0]], Ytv[stages[0]],
-                    sample_weight=Wtv[stages[0]],
-                    validation_data=(Xtv[stages[1]], Ytv[stages[1]], Wtv[stages[1]]),  # Wtv[stages[1]]
+                    validation_data=(Xtv[stages[1]], Ytv[stages[1]]),  # Wtv[stages[1]]
                     epochs=epochs,
                     verbose=args.verbose,
                     batch_size=batch_size,

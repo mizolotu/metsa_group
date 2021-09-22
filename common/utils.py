@@ -5,7 +5,7 @@ import pandas as pd
 import scipy.stats as ss
 
 from itertools import chain, combinations
-from config import br_key, ts_key
+from config import br_key, ts_key, series_step_prefix
 
 def load_meta(fpath):
     meta = None
@@ -22,7 +22,8 @@ def set_seeds(seed):
 
 def load_data(fpath, tags):
     df = pd.read_csv(fpath)
-    values = df[tags].values
+    tags_without_ts = [key for key in df.keys() if key.split(f'_{series_step_prefix}')[0] in tags]
+    values = df[tags_without_ts].values
     labels = df[br_key].values
     timestamps = df[ts_key].values
     return values, labels, timestamps

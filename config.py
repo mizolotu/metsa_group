@@ -37,6 +37,7 @@ yellow_tags = ['126A0159-HS', '126A0125-UI', '126A0164-UI', '126A7035-DLY', '126
 position_column = 'Positio'
 delay_class_column = 'Viiveluokka'
 nan_value = -1
+series_step_prefix = 'step'
 
 # ml
 

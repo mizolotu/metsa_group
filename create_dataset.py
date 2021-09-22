@@ -90,27 +90,35 @@ if __name__ == '__main__':
     features = [features[i] for i in feature_indexes_sorted]
     delay_classes = [delay_classes[i] for i in feature_indexes_sorted]
     values = values[:, feature_indexes_sorted]
-    feature_cols = features
+
+    # select values corresponding to timestamps when bleach ratio was measured
+
+    ts = np.array([dp.parse(item).timestamp() for item in timestamps])
+    deltas = labels[1:] - labels[:-1]
+    idx = np.where(deltas != 0)[0] + 1
+    labels = labels[idx]
+    timestamps = timestamps[idx]
 
     if args.series:
-        ts = np.array([dp.parse(item).timestamp() for item in timestamps])
-        deltas = labels[1:] - labels[:-1]
-        idx = np.where(deltas != 0)[0] + 1
         series = np.zeros((len(idx), series_len, values.shape[1]))
         for i, id in enumerate(idx):
             t = ts[id]
             t_idx = np.where((ts > (t - series_len * 60)) & (ts <= t))[0]
             t_deltas = t - ts[t_idx]
             series[i, :, :] = interpolate(np.arange(series_len)[::-1] * 60, t_deltas, values[t_idx, :])
-        labels = labels[idx]
-        timestamps = timestamps[idx]
         values = series.reshape(series.shape[0], -1)
-        feature_cols = [f for f in feature_cols for _ in range(series_len)]
+        feature_cols = []
+        for i in range(series_len):
+            feature_cols.extend([f'{f}_{series_step_prefix}{i}' for f in features])
+    else:
+        values = values[idx, :]
+        feature_cols = features
 
     print(f'Data sample timestamps are between {np.min(timestamps)} and {np.max(timestamps)}')
     print(f'Number of samples with label in interval [{np.min(labels)}, {br_min}): {len(np.where(labels < br_min)[0])}')
     print(f'Number of samples with label in interval [{br_min}, {br_max}): {len(np.where((labels >= br_min) & (labels <= br_max))[0])}')
     print(f'Number of samples with label in interval [{br_max}, {np.max(labels)}): {len(np.where(labels > br_max)[0])}')
+
 
     # meta
 
