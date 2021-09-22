@@ -40,7 +40,7 @@ def split(hidden, nfeatures, latent_dim=256):
     hidden = []
     for spl in hidden_spl:
         hidden.append(tf.keras.layers.Dense(latent_dim, activation='relu')(spl))
-    hidden = tf.stack(hidden, axis=1)
+    hidden = tf.stack(hidden, axis=-2)
     return hidden
 
 def mlp(hidden, nhiddens=[2048, 2048], dropout=0.5):
