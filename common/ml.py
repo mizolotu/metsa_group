@@ -3,14 +3,17 @@ import numpy as np
 
 from config import nan_value
 
-def model_input(features, steps, xmin, xmax, batchnorm=False, eps=1e-10):
+def model_input(features, xmin, xmax, steps=1, batchnorm=False, eps=1e-10):
 
     # input layer
 
     features_columns = [key for key in features]
     inputs = {colname: tf.keras.layers.Input(name=f'input_{colname}', shape=(steps,), dtype=tf.float32) for colname in features_columns}
     hidden = tf.keras.layers.Concatenate(axis=-1)(list(inputs.values()))
-    hidden = tf.keras.layers.Reshape(target_shape=(steps, len(features)))(hidden)
+    if steps > 1:
+        hidden = tf.keras.layers.Reshape(target_shape=(steps, len(features)))(hidden)
+    else:
+        hidden = tf.keras.layers.Reshape(target_shape=(len(features),))(hidden)
 
     # deal with nans
 
@@ -30,9 +33,13 @@ def model_input(features, steps, xmin, xmax, batchnorm=False, eps=1e-10):
 
     return inputs, hidden
 
-def baseline(hidden, nfeatures, nfilters=[256,512,1024], ks=4, ss=4, nhidden=1024):
+def cnn(hidden, nfeatures, nfilters=[256,512,1024], ks=4, ss=4):
     for nf in nfilters:
         hidden = tf.keras.layers.Conv1D(nf, ks, strides=ss, padding='same', activation='relu')(hidden)
+    return hidden
+
+def baseline(hidden, nfeatures, nhidden=256):
+    hidden = tf.keras.layers.Dense(nhidden*len(nfeatures), activation='relu')(hidden)
     return hidden
 
 def split(hidden, nfeatures, latent_dim=256):
@@ -56,7 +63,6 @@ def cnn1(hidden, nhiddens=[256, 512], nfilters=1024, kernel_size=2):
     for nhidden in nhiddens:
         hidden = tf.keras.layers.Conv1D(nhidden, kernel_size, padding='same', activation='relu')(hidden)
     hidden = tf.keras.layers.Conv1D(nfilters, last_conv_kernel_size, activation='relu')(hidden)
-    print(hidden)
     if hidden.shape[1] > 1:
         hidden = tf.keras.layers.Conv2D(nfilters, (hidden.shape[1], 1), activation='relu')(hidden)
     hidden = tf.keras.layers.Flatten()(hidden)

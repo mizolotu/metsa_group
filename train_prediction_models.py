@@ -208,7 +208,7 @@ if __name__ == '__main__':
 
                 print(f'Training new model {model_name}:')
 
-                inputs, hidden = model_input(features_selected, steps, xmin, xmax)
+                inputs, hidden = model_input(features_selected, xmin, xmax, steps)
                 input_type = locals()[args.input]
                 hidden = input_type(hidden, nfeatures)
                 extractor_type = locals()[feature_extractor]
