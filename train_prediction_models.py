@@ -1,5 +1,4 @@
 import os
-import scipy.stats as ss
 import os.path as osp
 
 import pandas as pd
@@ -8,8 +7,8 @@ import numpy as np
 import argparse as arp
 
 from config import *
-from common.utils import set_seeds, load_meta, load_data, pad_data, get_best_distribution
-from common.ml import model_input, model_output, baseline, split, mlp, cnn1, lstm, bilstm, cnn1lstm
+from common.utils import set_seeds, load_meta, load_data, pad_data
+from common.ml import model_input, split, mlp, cnn1, lstm, bilstm, cnn1lstm, re_output, ae_output
 
 if __name__ == '__main__':
 
@@ -17,8 +16,7 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train prediction models')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-i', '--input', help='Model input latent size', default='split', choices=['baseline', 'split'])
-    parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn1', 'lstm', 'bilstm', 'cnn1lstm'])
+    parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn1', 'lstm', 'bilstm', 'cnn1lstm', 'som'])
     parser.add_argument('-c', '--classes', help='Delay class when prediction starts', type=int, nargs='+', default=[4, 5])
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=seed)
     parser.add_argument('-g', '--gpu', help='GPU to use')
@@ -31,11 +29,11 @@ if __name__ == '__main__':
 
     # model input layer
 
-    if args.input == 'baseline':
-        feature_extractor = 'mlp'
-        print('Baseline model will use mlp feature extractor')
+    feature_extractor = args.extractor
+    if feature_extractor in ['som']:
+        ae = True
     else:
-        feature_extractor = args.extractor
+        ae = False
 
     # number of tests
 
@@ -92,7 +90,7 @@ if __name__ == '__main__':
 
         # model name
 
-        model_type = f'{args.input}_{feature_extractor}'
+        model_type = f'{feature_extractor}'
         model_name = f'{model_type}_{delay_class}'
 
         # create output directories
@@ -154,8 +152,6 @@ if __name__ == '__main__':
                 xmin = np.nanmin(values_k[stages[0]], axis=0)[:np.sum(nfeatures)]
                 xmax = np.nanmax(values_k[stages[0]], axis=0)[:np.sum(nfeatures)]
             elif len(values_k[stages[0]].shape) == 3:
-            #    xmin = np.nanmin(values_k[stages[0]][:, -1, :], axis=0)[:np.sum(nfeatures)]
-            #    xmax = np.nanmax(values_k[stages[0]][:, -1, :], axis=0)[:np.sum(nfeatures)]
                 xmin = np.nanmin(values_k[stages[0]], axis=0)[:, :np.sum(nfeatures)]
                 xmax = np.nanmax(values_k[stages[0]], axis=0)[:, :np.sum(nfeatures)]
 
@@ -173,9 +169,6 @@ if __name__ == '__main__':
                 Xtv[stage], Ytv[stage] = {}, {}
                 #Xtmp = pad_data(values_k[stage], features_selected, features, classes, model_dc_comb)
                 Xtmp = values_k[stage]
-                #Ytmp = labels_k[stage]
-                #Xtmp = np.vstack(Xtmp)
-                #Ytmp = np.hstack(Ytmp)
                 if len(Xtmp.shape) == 2:
                     for i, fs in enumerate(features_selected):
                         Xtv[stage][fs] = Xtmp[:, i]
@@ -208,12 +201,14 @@ if __name__ == '__main__':
 
                 print(f'Training new model {model_name}:')
 
-                inputs, hidden = model_input(features_selected, xmin, xmax, steps)
-                input_type = locals()[args.input]
-                hidden = input_type(hidden, nfeatures)
-                extractor_type = locals()[feature_extractor]
-                hidden = extractor_type(hidden)
-                model = model_output(inputs, hidden, br_key, ymin, ymax)
+                inputs, inputs_processed = model_input(features_selected, xmin, xmax, steps)
+                if ae:
+                    model = ae_output(inputs_processed, nfeatures)
+                else:
+                    hidden = split(inputs_processed, nfeatures)
+                    extractor_type = locals()[feature_extractor]
+                    hidden = extractor_type(hidden)
+                    model = re_output(inputs, hidden, br_key, ymin, ymax)
                 model_summary_lines = []
                 model.summary(print_fn=lambda x: model_summary_lines.append(x))
                 model_summary = "\n".join(model_summary_lines)

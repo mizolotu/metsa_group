@@ -33,15 +33,6 @@ def model_input(features, xmin, xmax, steps=1, batchnorm=False, eps=1e-10):
 
     return inputs, hidden
 
-def cnn(hidden, nfeatures, nfilters=[256,512,1024], ks=4, ss=4):
-    for nf in nfilters:
-        hidden = tf.keras.layers.Conv1D(nf, ks, strides=ss, padding='same', activation='relu')(hidden)
-    return hidden
-
-def baseline(hidden, nfeatures, nhidden=256):
-    hidden = tf.keras.layers.Dense(nhidden*len(nfeatures), activation='relu')(hidden)
-    return hidden
-
 def split(hidden, nfeatures, latent_dim=256):
     hidden_spl = tf.split(hidden, nfeatures, axis=-1)
     hidden = []
@@ -63,43 +54,13 @@ def cnn1(hidden, nhiddens=[256, 512], nfilters=1024, kernel_size=2):
     for nhidden in nhiddens:
         hidden = tf.keras.layers.Conv1D(nhidden, kernel_size, padding='same', activation='relu')(hidden)
     hidden = tf.keras.layers.Conv1D(nfilters, last_conv_kernel_size, activation='relu')(hidden)
-    if hidden.shape[1] > 1:
-        hidden = tf.keras.layers.Conv2D(nfilters, (hidden.shape[1], 1), activation='relu')(hidden)
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
-
-def cnn1m(hidden, nhiddens=[1280, 1280], nfilters=1024):
-    nstreams = len(nhiddens)
-    nfilters_max = hidden.shape[1]
-    last_conv_kernel_size = nfilters_max * nstreams
-    hiddens = []
-    for i in range(nstreams):
-        nf = np.clip(nfilters_max - i, 1, nfilters_max).astype(int)
-        hiddens.append(tf.keras.layers.Conv1D(nhiddens[i], (nf,), padding='same', activation='relu')(hidden))
-    hidden = tf.concat(hiddens, axis=1)
-    hidden = tf.keras.layers.Conv1D(nfilters, last_conv_kernel_size, activation='relu')(hidden)
-    hidden = tf.keras.layers.Flatten()(hidden)
-    return hidden
-
-def attention_block(x, nh):
-    q = tf.keras.layers.Dense(nh, activation='relu')(x)
-    v = tf.keras.layers.Dense(nh, activation='relu')(x)
-    a = tf.keras.layers.Dense(1)(tf.nn.tanh(q + v))
-    a = tf.keras.layers.Softmax(axis=1)(a)
-    h = tf.keras.layers.Multiply()([a, v])
-    h = tf.reduce_sum(h, axis=1)
-    return h
 
 def lstm(hidden, nhidden=640):
     hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
     hidden = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden)
     hidden = tf.keras.layers.LSTM(nhidden)(hidden)
-    return hidden
-
-def lstmatt(hidden, nhidden=1280):
-    hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
-    hidden = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden)
-    hidden = Attention()(hidden)
     return hidden
 
 def bilstm(hidden, nhidden=640):
@@ -115,85 +76,138 @@ def cnn1lstm(hidden, nfilters=[1280, 1280], kernel_size=2, nhidden=640):
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
-class Attention(tf.keras.layers.Layer):
+def som(inputs, inputs_processed, hidden, lr=1e-6, eps=1e-8):
+    model = SOM(layers, dropout, batchnorm)
+    model.build(input_shape=(None, nsteps, nfeatures))
+    model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
 
-    def __init__(self,**kwargs):
-        super(Attention, self).__init__(**kwargs)
-
-    def build(self, input_shape):
-        self.W = self.add_weight(name="att_weight1",shape=(input_shape[-1], 1),initializer="normal")
-        self.b = self.add_weight(name="att_bias1",shape=(input_shape[1], 1),initializer="zeros")
-        super(Attention, self).build(input_shape)
-
-    def call(self, x):
-        et=tf.squeeze(tf.tanh(tf.tensordot(x, self.W, 1) + self.b), axis=-1)
-        at=tf.math.softmax(et)
-        at=tf.expand_dims(at, axis=-1)
-        output=x * at
-        return tf.math.reduce_sum(output, axis=1)
-
-    def compute_output_shape(self, input_shape):
-        return (input_shape[0], input_shape[-1])
-
-    def get_config(self):
-        return super(Attention, self).get_config()
-
-class Attention2(tf.keras.layers.Layer):
-
-    def __init__(self,**kwargs):
-        super(Attention2, self).__init__(**kwargs)
-
-    def build(self, input_shape):
-        self.W1 = self.add_weight(name="att_weight1",shape=(input_shape[-1], 1),initializer="normal")
-        self.b1 = self.add_weight(name="att_bias1",shape=(input_shape[1] // 2, 1),initializer="zeros")
-        self.W2 = self.add_weight(name="att_weight2", shape=(input_shape[-1], 1), initializer="normal")
-        self.b2 = self.add_weight(name="att_bias2", shape=(input_shape[1] // 2, 1), initializer="zeros")
-        super(Attention, self).build(input_shape)
-
-    def call(self, x):
-        x1, x2 = tf.split(x, num_or_size_splits=2, axis=1)
-        et1=tf.squeeze(tf.tanh(tf.tensordot(x1, self.W1, 1) + self.b1), axis=-1)
-        at1=tf.math.softmax(et1)
-        at1=tf.expand_dims(at1, axis=-1)
-        output1=x2 * at1
-        et2 = tf.squeeze(tf.tanh(tf.tensordot(x2, self.W2, 1) + self.b2), axis=-1)
-        at2 = tf.math.softmax(et2)
-        at2 = tf.expand_dims(at2, axis=-1)
-        output2 = x1 * at2
-        output = tf.concat([output1, output2], axis=1)
-        return tf.math.reduce_sum(output, axis=1)
-
-    def compute_output_shape(self, input_shape):
-        return (input_shape[0], input_shape[-1])
-
-    def get_config(self):
-        return super(Attention2, self).get_config()
-
-def att(hidden, nhidden=640):
-    hidden1 = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
-    hidden1 = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden1)
-    hidden2 = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
-    hidden2 = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden2)
-    hidden = tf.concat([hidden1, hidden2], axis=1)
-    hidden = Attention()(hidden)
-    return hidden
-
-def bilstm_att(hidden, nhidden=640):
-    hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
-    hidden = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(nhidden, activation='relu', return_sequences=True))(hidden)
-    hidden = Attention()(hidden)
-    hidden = tf.keras.layers.Flatten()(hidden)
-    return hidden
-
-def model_output(inputs, hidden, target, ymin, ymax, nhidden=2048, dropout=0.5, lr=1e-6, eps=1e-8):
-    hidden = tf.keras.layers.Dense(nhidden, activation='relu')(hidden)
+def re_output(inputs, hidden, target, ymin, ymax, nhidden=2048, dropout=0.5, lr=1e-6, eps=1e-8):
     if dropout is not None:
         hidden = tf.keras.layers.Dropout(dropout)(hidden)
+    hidden = tf.keras.layers.Dense(nhidden, activation='relu')(hidden)
     outputs = tf.keras.layers.Dense(1, activation='linear')(hidden)
     outputs = outputs * (ymax - ymin) + ymin
     outputs = {target: outputs}
     model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-    #loss = tf.keras.losses.MeanAbsoluteError()
     loss = tf.keras.losses.MeanSquaredError()
     model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(learning_rate=lr, epsilon=eps), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
     return model
+
+class SOMLayer(tf.keras.layers.Layer):
+
+    def __init__(self, map_size, prototypes=None, **kwargs):
+        if 'input_shape' not in kwargs and 'latent_dim' in kwargs:
+            kwargs['input_shape'] = (kwargs.pop('latent_dim'),)
+        super(SOMLayer, self).__init__(**kwargs)
+        self.map_size = map_size
+        self.nprototypes = np.prod(map_size)
+        self.initial_prototypes = prototypes
+        self.prototypes = None
+        self.built = False
+
+    def build(self, input_shape):
+        input_dims = input_shape[1:]
+        self.input_spec = tf.keras.layers.InputSpec(dtype=tf.float32, shape=(None, *input_dims))
+        self.prototypes = self.add_weight(shape=(self.nprototypes, *input_dims), initializer='glorot_uniform', name='prototypes')
+        if self.initial_prototypes is not None:
+            self.set_weights(self.initial_prototypes)
+            del self.initial_prototypes
+        self.built = True
+
+    def call(self, inputs, **kwargs):
+        d = tf.reduce_mean(tf.reduce_sum(tf.square(tf.expand_dims(inputs, axis=1) - self.prototypes), axis=-1), axis=-1)
+        return d
+
+    def compute_output_shape(self, input_shape):
+        assert(input_shape and len(input_shape) == 2)
+        return input_shape[0], self.nprototypes
+
+    def get_config(self):
+        config = {'map_size': self.map_size}
+        base_config = super(SOMLayer, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+def som_loss(weights, distances):
+    return tf.reduce_mean(tf.reduce_sum(weights * distances, axis=1))
+
+class SOM(tf.keras.models.Model):
+
+    def __init__(self, map_size, batchnorm, T_min=0.1, T_max=10.0, niterations=10000, nnn=4):
+        super(SOM, self).__init__()
+        self.map_size = map_size
+        self.nprototypes = np.prod(map_size)
+        ranges = [np.arange(m) for m in map_size]
+        mg = np.meshgrid(*ranges, indexing='ij')
+        self.prototype_coordinates = tf.convert_to_tensor(np.array([item.flatten() for item in mg]).T)
+        self.split_layer = tf.keras.layers.BatchNormalization(trainable=batchnorm)
+        self.som_layer = SOMLayer(map_size, name='som_layer')
+        self.T_min = T_min
+        self.T_max = T_max
+        self.niterations = niterations
+        self.current_iteration = 0
+        self.total_loss_tracker = tf.keras.metrics.Mean(name='total_loss')
+        self.nnn = nnn
+
+    @property
+    def prototypes(self):
+        return self.som_layer.get_weights()[0]
+
+    def call(self, x):
+        x = self.bn_layer(x)
+        x = self.som_layer(x)
+        s = tf.sort(x, axis=1)
+        spl = tf.split(s, [self.nnn, self.nprototypes - self.nnn], axis=1)
+        return tf.reduce_mean(spl[0], axis=1)
+
+    def map_dist(self, y_pred):
+        labels = tf.gather(self.prototype_coordinates, y_pred)
+        mh = tf.reduce_sum(tf.math.abs(tf.expand_dims(labels, 1) - tf.expand_dims(self.prototype_coordinates, 0)), axis=-1)
+        return tf.cast(mh, tf.float32)
+
+    @staticmethod
+    def neighborhood_function(d, T):
+        return tf.math.exp(-(d ** 2) / (T ** 2))
+
+    def train_step(self, data):
+        inputs, outputs = data
+        with tf.GradientTape() as tape:
+
+            # Compute cluster assignments for batches
+
+            inputs = self.bn_layer(inputs)
+            d = self.som_layer(inputs)
+            y_pred = tf.math.argmin(d, axis=1)
+
+            # Update temperature parameter
+
+            self.current_iteration += 1
+            if self.current_iteration > self.niterations:
+                self.current_iteration = self.niterations
+            self.T = self.T_max * (self.T_min / self.T_max) ** (self.current_iteration / (self.niterations - 1))
+
+            # Compute topographic weights batches
+
+            w_batch = self.neighborhood_function(self.map_dist(y_pred), self.T)
+
+            # calculate loss
+
+            loss = som_loss(w_batch, d)
+
+        grads = tape.gradient(loss, self.trainable_weights)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+        self.total_loss_tracker.update_state(loss)
+        return {
+            "total_loss": self.total_loss_tracker.result()
+        }
+
+    def test_step(self, data):
+        inputs, outputs = data
+        inputs = self.bn_layer(inputs)
+        d = self.som_layer(inputs)
+        y_pred = tf.math.argmin(d, axis=1)
+        w_batch = self.neighborhood_function(self.map_dist(y_pred), self.T)
+        loss = som_loss(w_batch, d)
+        self.total_loss_tracker.update_state(loss)
+        return {
+            "total_loss": self.total_loss_tracker.result()
+        }
