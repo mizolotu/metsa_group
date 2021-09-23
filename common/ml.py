@@ -397,26 +397,15 @@ class EarlyStoppingAtMaxMetric(tf.keras.callbacks.Callback):
                 self.model.set_weights(self.best_weights)
 
     def on_test_end(self, logs):
-        probs = []
-        testy = []
-        print(self.validation_data)
-        for x in self.validation_data:
-            print(x)
-            if len(y.shape) > 1:
-                y_labels = y[:, -1]
-            else:
-                y_labels = y
-            y_labels = np.clip(y_labels, 0, 1)
-            predictions = self.model.predict(x)
-            new_probs = predictions.flatten()
-            probs = np.hstack([probs, new_probs])
-            testy = np.hstack([testy, y_labels])
+        x, y = self.validation_data
+        predictions = self.model.predict(x)
+        probs = predictions.flatten()
         if self.metric == 'auc':
-            self.current = roc_auc_score(testy, probs, max_fpr=self.max_fpr)
+            self.current = roc_auc_score(y, probs, max_fpr=self.max_fpr)
         elif self.metric == 'acc':
-            n = len(testy)
-            p0 = probs[np.where(testy == 0)[0]]
-            p1 = probs[np.where(testy == 1)[0]]
+            n = len(y)
+            p0 = probs[np.where(y == 0)[0]]
+            p1 = probs[np.where(y == 1)[0]]
             p0si = np.argsort(p0)
             p1si = np.argsort(p1)
             p0s = p0[p0si]
