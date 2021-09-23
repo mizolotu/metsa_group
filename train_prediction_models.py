@@ -110,6 +110,9 @@ if __name__ == '__main__':
         if ntests == 1 and not args.retrain:
             try:
                 model = tf.keras.models.load_model(m_path)
+                print(model.inputs)
+                print(model.input_spec)
+                print(model.input_shape)
                 have_to_create_model = False
                 print(f'Model {model_name} has been loaded from {m_path}')
             except Exception as e:
