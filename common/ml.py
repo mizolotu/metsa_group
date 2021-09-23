@@ -80,7 +80,7 @@ def som(features, xmin, xmax, nfeatures, layers=[64, 64], lr=1e-6):
     model = SOM(layers, features, xmin, xmax, nfeatures)
     model.build(input_shape={f: (None, 1) for f in features})
     model.compute_output_shape({f: (None, 1) for f in features})
-    model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[ReconstructionAccuracy('acc')])
+    model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
     return model
 
 def model_output(inputs, hidden, target, ymin, ymax, nhidden=2048, dropout=0.5, lr=1e-6, eps=1e-8):
@@ -134,11 +134,12 @@ def som_loss(weights, distances):
 
 class SOM(tf.keras.models.Model):
 
-    def __init__(self, map_size, features, xmin, xmax, nfeatures, split_neurons=256, encoder_filters=[256, 512, 1024], decoder_filters=256, T_min=0.1, T_max=10.0, niterations=10000, nnn=4, batchnorm=False, eps=1e-10):
+    def __init__(self, map_size, features, xmin, xmax, nfeatures, target, split_neurons=256, encoder_filters=[256, 512, 1024], decoder_filters=256, T_min=0.1, T_max=10.0, niterations=10000, nnn=4, batchnorm=False, eps=1e-10):
         super(SOM, self).__init__()
 
         self.map_size = map_size
         self.features = features
+        self.target = target
         self.xmin = xmin
         self.xmax = xmax
         self.nfeatures = nfeatures
@@ -163,6 +164,7 @@ class SOM(tf.keras.models.Model):
         self.current_iteration = 0
         self.loss_tracker = tf.keras.metrics.Mean(name='loss')
         self.re_tracker = tf.keras.metrics.Mean(name='re')
+        self.acc_tracker = ReconstructionAccuracy('acc')
         self.nnn = nnn
 
     @property
@@ -237,8 +239,9 @@ class SOM(tf.keras.models.Model):
 
         # input
 
-        x, outputs = data
+        x, y = data
         x = tf.keras.layers.Concatenate(axis=-1)([tf.expand_dims(x[f], -1) for f in self.features])
+        y = y[self.target]
 
         with tf.GradientTape() as tape:
 
@@ -313,8 +316,9 @@ class SOM(tf.keras.models.Model):
 
         # input
 
-        x, outputs = data
+        x, y = data
         x = tf.keras.layers.Concatenate(axis=-1)([tf.expand_dims(x[f], -1) for f in self.features])
+        y = y[self.target]
 
         # deal with nans
 

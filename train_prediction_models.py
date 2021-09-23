@@ -207,7 +207,7 @@ if __name__ == '__main__':
                 print(f'Training new model {model_name}:')
 
                 if ae:
-                    model = som(features_selected, xmin, xmax, nfeatures)
+                    model = som(features_selected, xmin, xmax, nfeatures, br_key)
                 else:
                     inputs, inputs_processed = model_input(features_selected, xmin, xmax, steps)
                     hidden = split(inputs_processed, nfeatures)
