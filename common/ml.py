@@ -170,6 +170,7 @@ class SOM(tf.keras.models.Model):
         return self.som_layer.get_weights()[0]
 
     def call(self, x):
+        print('call')
 
         # input
 
@@ -234,6 +235,7 @@ class SOM(tf.keras.models.Model):
         return tf.math.exp(-(d ** 2) / (T ** 2))
 
     def train_step(self, data):
+        print('tr step')
 
         # input
 
