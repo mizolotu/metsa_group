@@ -400,7 +400,8 @@ class EarlyStoppingAtMaxMetric(tf.keras.callbacks.Callback):
         probs = []
         testy = []
         print(self.validation_data)
-        for x, y in self.validation_data:
+        for x in self.validation_data:
+            print(x)
             if len(y.shape) > 1:
                 y_labels = y[:, -1]
             else:
