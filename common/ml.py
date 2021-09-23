@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 
 from config import nan_value
+from sklearn.metrics import roc_auc_score
 
 def model_input(features, xmin, xmax, steps=1, batchnorm=False, eps=1e-10):
 
@@ -366,3 +367,75 @@ class SOM(tf.keras.models.Model):
             "loss": self.loss_tracker.result(),
             "re": self.re_tracker.result()
         }
+
+class EarlyStoppingAtMaxMetric(tf.keras.callbacks.Callback):
+
+    def __init__(self, validation_data, metric, patience=10, max_fpr=1.0):
+        super(EarlyStoppingAtMaxMetric, self).__init__()
+        self.patience = patience
+        self.best_weights = None
+        self.metric = metric
+        self.validation_data = validation_data
+        self.current = -np.Inf
+        self.max_fpr = max_fpr
+
+    def on_train_begin(self, logs=None):
+        self.wait = 0
+        self.stopped_epoch = 0
+        self.best = -np.Inf
+
+    def on_epoch_end(self, epoch, logs=None):
+        if np.greater(self.current, self.best):
+            self.best = self.current
+            self.wait = 0
+            self.best_weights = self.model.get_weights()
+        else:
+            self.wait += 1
+            if self.wait >= self.patience:
+                self.stopped_epoch = epoch
+                self.model.stop_training = True
+                self.model.set_weights(self.best_weights)
+
+    def on_test_end(self, logs):
+        probs = []
+        testy = []
+        print(self.validation_data)
+        for x, y in self.validation_data:
+            if len(y.shape) > 1:
+                y_labels = y[:, -1]
+            else:
+                y_labels = y
+            y_labels = np.clip(y_labels, 0, 1)
+            predictions = self.model.predict(x)
+            new_probs = predictions.flatten()
+            probs = np.hstack([probs, new_probs])
+            testy = np.hstack([testy, y_labels])
+        if self.metric == 'auc':
+            self.current = roc_auc_score(testy, probs, max_fpr=self.max_fpr)
+        elif self.metric == 'acc':
+            n = len(testy)
+            p0 = probs[np.where(testy == 0)[0]]
+            p1 = probs[np.where(testy == 1)[0]]
+            p0si = np.argsort(p0)
+            p1si = np.argsort(p1)
+            p0s = p0[p0si]
+            p1s = p1[p1si]
+            n0 = len(p0s)
+            n1 = len(p1s)
+            if p1s[0] > p0s[-1]:
+                acc = [1]
+            else:
+                idx = np.where(p0s > p1s[0])[0]
+                acc = [float(len(p0s) - len(idx) + len(p1s)) / n, *np.zeros(len(idx))]
+                h = n0 - len(idx)
+                n10 = 0
+                for i, j in enumerate(idx):
+                    thr = p0s[j]
+                    thridx = np.where(p1s[n10:] < thr)[0]
+                    n10 += len(thridx)
+                    h += 1
+                    acc[i + 1] = (h - n10 + n1) / n
+            self.current = np.max(acc)
+        else:
+            raise NotImplemented
+        print(f'\nValidation {self.metric}:', self.current)
