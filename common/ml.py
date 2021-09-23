@@ -301,7 +301,7 @@ class SOM(tf.keras.models.Model):
 
             rec_errors = tf.math.sqrt(tf.reduce_sum(tf.square(x - x_rec), axis=-1))
             cl_dists = som_loss(w_batch, d)
-            losses = tf.math.add(rec_errors, cl_dists)
+            losses = tf.math.add(rec_errors, 0.1 * cl_dists)
             loss = tf.reduce_mean(losses)
 
         grads = tape.gradient(loss, self.trainable_weights)
@@ -368,7 +368,7 @@ class SOM(tf.keras.models.Model):
 
         rec_errors = tf.math.sqrt(tf.reduce_sum(tf.square(x - x_rec), axis=-1))
         cl_dists = som_loss(w_batch, d)
-        losses = tf.math.add(rec_errors, cl_dists)
+        losses = tf.math.add(rec_errors, 0.1 * cl_dists)
         loss = tf.reduce_mean(losses)
 
         self.loss_tracker.update_state(loss)
