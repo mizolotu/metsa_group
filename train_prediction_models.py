@@ -217,7 +217,6 @@ if __name__ == '__main__':
 
                 print(model.inputs)
                 print(model.input_spec)
-                print(model.input_shape)
 
                 model.fit(
                     Xtv[stages[0]], Ytv[stages[0]],

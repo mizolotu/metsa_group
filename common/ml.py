@@ -163,7 +163,6 @@ class SOM(tf.keras.models.Model):
     def build(self, input_shape):
         self.inputs = {colname: tf.keras.layers.Input(name=f'input_{colname}', shape=(1,), dtype=tf.float32) for colname in input_shape}
         self.input_spec = [{colname: tf.keras.layers.InputSpec(shape=(1,), dtype=tf.float32)} for colname in input_shape]
-        self.input_shape = {colname: (None, 1) for colname in input_shape}
         self.built = True
 
     def call(self, x):
