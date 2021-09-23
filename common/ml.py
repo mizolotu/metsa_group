@@ -220,6 +220,7 @@ class SOM(tf.keras.models.Model):
 
         cl_dist = tf.reduce_mean(spl[0], axis=1)
         rec_error = tf.reduce_mean(tf.math.sqrt(tf.reduce_sum(tf.square(x - x_rec), axis=-1)), axis=-1)
+        print(cl_dist, rec_error)
 
         return cl_dist + rec_error
 
