@@ -77,6 +77,7 @@ def cnn1lstm(hidden, nfilters=[1280, 1280], kernel_size=2, nhidden=640):
 
 def som(features, xmin, xmax, nfeatures, layers=[64, 64], lr=1e-6):
     model = SOM(layers, features, xmin, xmax, nfeatures)
+    model.build(features)
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
     return model
 
@@ -155,12 +156,15 @@ class SOM(tf.keras.models.Model):
         self.loss_tracker = tf.keras.metrics.Mean(name='loss')
         self.nnn = nnn
 
-        self.inputs = {colname: tf.keras.layers.Input(name=f'input_{colname}', shape=(1,), dtype=tf.float32) for colname in self.features}
-        self.built = True
-
     @property
     def prototypes(self):
         return self.som_layer.get_weights()[0]
+
+    def build(self, input_shape):
+        self.inputs = {colname: tf.keras.layers.Input(name=f'input_{colname}', shape=(1,), dtype=tf.float32) for colname in input_shape}
+        self.input_spec = [{colname: tf.keras.layers.InputSpec(shape=(1,), dtype=tf.float32)} for colname in input_shape]
+        self.input_shape = {colname: (None, 1) for colname in input_shape}
+        self.built = True
 
     def call(self, x):
 

@@ -110,9 +110,6 @@ if __name__ == '__main__':
         if ntests == 1 and not args.retrain:
             try:
                 model = tf.keras.models.load_model(m_path)
-                print(model.inputs)
-                print(model.input_spec)
-                print(model.input_shape)
                 have_to_create_model = False
                 print(f'Model {model_name} has been loaded from {m_path}')
             except Exception as e:
@@ -217,6 +214,10 @@ if __name__ == '__main__':
                 model_summary = "\n".join(model_summary_lines)
                 if args.verbose and k == 0:
                     print(model_summary)
+
+                print(model.inputs)
+                print(model.input_spec)
+                print(model.input_shape)
 
                 model.fit(
                     Xtv[stages[0]], Ytv[stages[0]],
