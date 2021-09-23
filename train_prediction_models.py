@@ -8,7 +8,7 @@ import argparse as arp
 
 from config import *
 from common.utils import set_seeds, load_meta, load_data, pad_data
-from common.ml import model_input, split, mlp, cnn1, lstm, bilstm, cnn1lstm, re_output, ae_output
+from common.ml import model_input, split, mlp, cnn1, lstm, bilstm, cnn1lstm, model_output, som
 
 if __name__ == '__main__':
 
@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train prediction models')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn1', 'lstm', 'bilstm', 'cnn1lstm', 'som'])
+    parser.add_argument('-e', '--extractor', help='Feature extractor', default='som', choices=['mlp', 'cnn1', 'lstm', 'bilstm', 'cnn1lstm', 'som'])
     parser.add_argument('-c', '--classes', help='Delay class when prediction starts', type=int, nargs='+', default=[4, 5])
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=seed)
     parser.add_argument('-g', '--gpu', help='GPU to use')
@@ -201,14 +201,14 @@ if __name__ == '__main__':
 
                 print(f'Training new model {model_name}:')
 
-                inputs, inputs_processed = model_input(features_selected, xmin, xmax, steps)
                 if ae:
-                    model = ae_output(inputs_processed, nfeatures)
+                    model = som(features_selected, xmin, xmax, nfeatures)
                 else:
+                    inputs, inputs_processed = model_input(features_selected, xmin, xmax, steps)
                     hidden = split(inputs_processed, nfeatures)
                     extractor_type = locals()[feature_extractor]
                     hidden = extractor_type(hidden)
-                    model = re_output(inputs, hidden, br_key, ymin, ymax)
+                    model = model_output(inputs, hidden, br_key, ymin, ymax)
                 model_summary_lines = []
                 model.summary(print_fn=lambda x: model_summary_lines.append(x))
                 model_summary = "\n".join(model_summary_lines)
