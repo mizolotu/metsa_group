@@ -76,8 +76,8 @@ def cnn1lstm(hidden, nfilters=[1280, 1280], kernel_size=2, nhidden=640):
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
-def som(features, xmin, xmax, nfeatures, layers=[64, 64], lr=1e-6):
-    model = SOM(layers, features, xmin, xmax, nfeatures)
+def som(features, xmin, xmax, nfeatures, target, layers=[64, 64], lr=1e-6):
+    model = SOM(layers, features, xmin, xmax, nfeatures, target)
     model.build(input_shape={f: (None, 1) for f in features})
     model.compute_output_shape({f: (None, 1) for f in features})
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
@@ -130,7 +130,7 @@ class SOMLayer(tf.keras.layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 def som_loss(weights, distances):
-    return tf.reduce_mean(tf.reduce_sum(weights * distances, axis=1))
+    return tf.reduce_sum(weights * distances, axis=1)
 
 class SOM(tf.keras.models.Model):
 
@@ -299,17 +299,21 @@ class SOM(tf.keras.models.Model):
 
             # calculate loss
 
-            rec_error = tf.reduce_mean(tf.math.sqrt(tf.reduce_sum(tf.square(x - x_rec), axis=-1)), axis=-1)
-            loss = tf.math.add(som_loss(w_batch, d), rec_error)
+            rec_errors = tf.math.sqrt(tf.reduce_sum(tf.square(x - x_rec), axis=-1))
+            cl_dists = som_loss(w_batch, d)
+            losses = tf.math.add(rec_errors, cl_dists)
+            loss = tf.reduce_mean(losses)
 
         grads = tape.gradient(loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
         self.loss_tracker.update_state(loss)
-        self.re_tracker.update_state(rec_error)
+        self.re_tracker.update_state(tf.reduce_mean(rec_errors))
+        self.acc_tracker.update_state(y, losses)
 
         return {
             "loss": self.loss_tracker.result(),
-            "re": self.re_tracker.result()
+            "re": self.re_tracker.result(),
+            "acc": self.acc_tracker.result()
         }
 
     def test_step(self, data):
@@ -361,15 +365,20 @@ class SOM(tf.keras.models.Model):
         d = self.som_layer(x_spl)
         y_pred = tf.math.argmin(d, axis=1)
         w_batch = self.neighborhood_function(self.map_dist(y_pred), self.T)
-        rec_error = tf.reduce_mean(tf.math.sqrt(tf.reduce_sum(tf.square(x - x_rec), axis=-1)), axis=-1)
-        loss = tf.math.add(som_loss(w_batch, d), rec_error)
+
+        rec_errors = tf.math.sqrt(tf.reduce_sum(tf.square(x - x_rec), axis=-1))
+        cl_dists = som_loss(w_batch, d)
+        losses = tf.math.add(rec_errors, cl_dists)
+        loss = tf.reduce_mean(losses)
 
         self.loss_tracker.update_state(loss)
-        self.re_tracker.update_state(rec_error)
+        self.re_tracker.update_state(tf.reduce_mean(rec_errors))
+        self.acc_tracker.update_state(y, losses)
 
         return {
             "loss": self.loss_tracker.result(),
-            "re": self.re_tracker.result()
+            "re": self.re_tracker.result(),
+            "acc": self.acc_tracker.result()
         }
 
 class EarlyStoppingAtMaxMetric(tf.keras.callbacks.Callback):
@@ -443,11 +452,9 @@ class ReconstructionAccuracy(tf.keras.metrics.Metric):
         self.true_labels = tf.Variable([], shape=(None,), validate_shape=False)
 
     def update_state(self, y_true, y_pred, sample_weight=None):
-        y_true, label_true = tf.split(y_true, [y_pred.shape[1], 1], axis=1)
-        label_true = tf.clip_by_value(label_true, 0, 1)
-        reconstruction_errors = tf.math.sqrt(tf.reduce_sum(tf.square(y_true - y_pred), axis=-1))
-        self.reconstruction_errors.assign(tf.concat([self.reconstruction_errors.value(), reconstruction_errors], axis=0))
-        self.true_labels.assign(tf.concat([self.true_labels.value(), label_true[:, 0]], axis=0))
+        y_true = tf.clip_by_value(y_true, 0, 1)
+        self.reconstruction_errors.assign(tf.concat([self.reconstruction_errors.value(), y_pred], axis=0))
+        self.true_labels.assign(tf.concat([self.true_labels.value(), y_true], axis=0))
 
     def result(self):
         thr = tf.reduce_mean(self.reconstruction_errors) + self.alpha * tf.math.reduce_std(self.reconstruction_errors)

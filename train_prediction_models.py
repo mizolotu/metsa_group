@@ -136,10 +136,12 @@ if __name__ == '__main__':
             val, remaining = np.split(inds, [int(validation_share * len(inds))])
             tr, te = np.split(remaining, [int(train_test_ratio * len(remaining))])
             if ae:
-                outlier_ids = tr[np.where((labels[tr] < br_min) | (labels[tr] > br_max))[0]]
+                labels[np.where((labels < br_min) | (labels > br_max))[0]] = 1
+                labels[np.where((labels >= br_min) & (labels <= br_max))[0]] = 0
+                outlier_ids = tr[np.where(labels[tr] == 1)[0]]
                 val = np.append(val, outlier_ids)
                 te = np.append(te, outlier_ids)
-                tr = tr[np.where((labels[tr] >= br_min) & (labels[tr] <= br_max))[0]]
+                tr = tr[np.where(labels[tr] == 0)[0]]
             if args.mode == 'production':
                 tr = np.hstack([tr, val])
                 val = te.copy()
