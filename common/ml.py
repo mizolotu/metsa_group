@@ -220,9 +220,8 @@ class SOM(tf.keras.models.Model):
 
         cl_dist = tf.reduce_mean(spl[0], axis=1)
         rec_error = tf.reduce_mean(tf.math.sqrt(tf.reduce_sum(tf.square(x - x_rec), axis=-1)), axis=-1)
-        print(cl_dist, rec_error)
 
-        return cl_dist + rec_error
+        return tf.math.add(cl_dist, rec_error)
 
     def map_dist(self, y_pred):
         labels = tf.gather(self.prototype_coordinates, y_pred)
@@ -297,7 +296,7 @@ class SOM(tf.keras.models.Model):
             # calculate loss
 
             rec_error = tf.reduce_mean(tf.math.sqrt(tf.reduce_sum(tf.square(x - x_rec), axis=-1)), axis=-1)
-            loss = som_loss(w_batch, d) + rec_error
+            loss = tf.math.add(som_loss(w_batch, d), rec_error)
 
         grads = tape.gradient(loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
@@ -358,7 +357,7 @@ class SOM(tf.keras.models.Model):
         y_pred = tf.math.argmin(d, axis=1)
         w_batch = self.neighborhood_function(self.map_dist(y_pred), self.T)
         rec_error = tf.reduce_mean(tf.math.sqrt(tf.reduce_sum(tf.square(x - x_rec), axis=-1)), axis=-1)
-        loss = som_loss(w_batch, d) + rec_error
+        loss = tf.math.add(som_loss(w_batch, d), rec_error)
 
         self.loss_tracker.update_state(loss)
         self.re_tracker.update_state(rec_error)
