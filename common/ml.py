@@ -257,7 +257,7 @@ class SOM(tf.keras.models.Model):
 
         grads = tape.gradient(loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
-        self.total_loss_tracker.update_state(loss)
+        self.loss_tracker.update_state(loss)
         return {
             "loss": self.loss_tracker.result()
         }
