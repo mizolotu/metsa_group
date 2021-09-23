@@ -80,7 +80,7 @@ def som(features, xmin, xmax, nfeatures, layers=[64, 64], lr=1e-6):
     model = SOM(layers, features, xmin, xmax, nfeatures)
     model.build(input_shape={f: (None, 1) for f in features})
     model.compute_output_shape({f: (None, 1) for f in features})
-    model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
+    model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[ReconstructionAccuracy('acc')])
     return model
 
 def model_output(inputs, hidden, target, ymin, ymax, nhidden=2048, dropout=0.5, lr=1e-6, eps=1e-8):
@@ -170,7 +170,6 @@ class SOM(tf.keras.models.Model):
         return self.som_layer.get_weights()[0]
 
     def call(self, x):
-        print('call')
 
         # input
 
@@ -235,7 +234,6 @@ class SOM(tf.keras.models.Model):
         return tf.math.exp(-(d ** 2) / (T ** 2))
 
     def train_step(self, data):
-        print('tr step')
 
         # input
 
@@ -431,3 +429,36 @@ class EarlyStoppingAtMaxMetric(tf.keras.callbacks.Callback):
         else:
             raise NotImplemented
         print(f'\nValidation {self.metric}:', self.current)
+
+class ReconstructionAccuracy(tf.keras.metrics.Metric):
+
+    def __init__(self, name='reconstruction_accuracy', alpha=3, **kwargs):
+        super(ReconstructionAccuracy, self).__init__(name=name, **kwargs)
+        self.alpha = alpha
+        self.reconstruction_errors = tf.Variable([], shape=(None,), validate_shape=False)
+        self.true_labels = tf.Variable([], shape=(None,), validate_shape=False)
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        y_true, label_true = tf.split(y_true, [y_pred.shape[1], 1], axis=1)
+        label_true = tf.clip_by_value(label_true, 0, 1)
+        reconstruction_errors = tf.math.sqrt(tf.reduce_sum(tf.square(y_true - y_pred), axis=-1))
+        self.reconstruction_errors.assign(tf.concat([self.reconstruction_errors.value(), reconstruction_errors], axis=0))
+        self.true_labels.assign(tf.concat([self.true_labels.value(), label_true[:, 0]], axis=0))
+
+    def result(self):
+        thr = tf.reduce_mean(self.reconstruction_errors) + self.alpha * tf.math.reduce_std(self.reconstruction_errors)
+        predictions = tf.math.greater_equal(self.reconstruction_errors, thr)
+        true_labels = tf.cast(self.true_labels, tf.bool)
+        true_positives = tf.logical_and(tf.equal(predictions, True), tf.equal(true_labels, True))
+        true_positives = tf.cast(true_positives, self.dtype)
+        true_negatives = tf.logical_and(tf.equal(predictions, False), tf.equal(true_labels, False))
+        true_negatives = tf.cast(true_negatives, self.dtype)
+        false_positives = tf.logical_and(tf.equal(predictions, True), tf.equal(true_labels, False))
+        false_positives = tf.cast(false_positives, self.dtype)
+        false_negatives = tf.logical_and(tf.equal(predictions, False), tf.equal(true_labels, True))
+        false_negatives = tf.cast(false_negatives, self.dtype)
+        return (tf.reduce_sum(true_positives) + tf.reduce_sum(true_negatives))  / (tf.reduce_sum(true_positives) + tf.reduce_sum(true_negatives) + tf.reduce_sum(false_positives) + tf.reduce_sum(false_negatives))
+
+    def reset_states(self):
+        self.reconstruction_errors.assign([])
+        self.true_labels.assign([])
