@@ -221,10 +221,10 @@ class SOM(tf.keras.models.Model):
 
         # error
 
-        cl_dist = tf.reduce_mean(spl[0], axis=1)
-        rec_error = tf.reduce_mean(tf.math.sqrt(tf.reduce_sum(tf.square(x - x_rec), axis=-1)), axis=-1)
+        cl_dists = tf.reduce_mean(spl[0], axis=1)
+        rec_errors = tf.math.sqrt(tf.reduce_sum(tf.square(x - x_rec), axis=-1))
 
-        return tf.math.add(cl_dist, rec_error)
+        return tf.math.add(cl_dists, rec_errors)
 
     def map_dist(self, y_pred):
         labels = tf.gather(self.prototype_coordinates, y_pred)
