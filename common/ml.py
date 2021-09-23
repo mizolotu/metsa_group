@@ -76,7 +76,7 @@ def cnn1lstm(hidden, nfilters=[1280, 1280], kernel_size=2, nhidden=640):
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
-def som(features, xmin, xmax, nfeatures, target, layers=[64, 64], lr=1e-4):
+def som(features, xmin, xmax, nfeatures, target, layers=[64, 64], lr=5e-5):
     model = SOM(layers, features, xmin, xmax, nfeatures, target)
     model.build(input_shape={f: (None, 1) for f in features})
     model.compute_output_shape({f: (None, 1) for f in features})
@@ -301,7 +301,7 @@ class SOM(tf.keras.models.Model):
 
             rec_errors = tf.math.sqrt(tf.reduce_sum(tf.square(x - x_rec), axis=-1))
             cl_dists = som_loss(w_batch, d)
-            losses = tf.math.add(rec_errors, 0.1 * cl_dists)
+            losses = tf.math.add(rec_errors, cl_dists)
             loss = tf.reduce_mean(losses)
 
         grads = tape.gradient(loss, self.trainable_weights)
@@ -368,7 +368,7 @@ class SOM(tf.keras.models.Model):
 
         rec_errors = tf.math.sqrt(tf.reduce_sum(tf.square(x - x_rec), axis=-1))
         cl_dists = som_loss(w_batch, d)
-        losses = tf.math.add(rec_errors, 0.1 * cl_dists)
+        losses = tf.math.add(rec_errors, cl_dists)
         loss = tf.reduce_mean(losses)
 
         self.loss_tracker.update_state(loss)
