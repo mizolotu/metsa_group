@@ -164,7 +164,6 @@ class SOM(tf.keras.models.Model):
         self.current_iteration = 0
         self.loss_tracker = tf.keras.metrics.Mean(name='loss')
         self.re_tracker = tf.keras.metrics.Mean(name='re')
-        self.acc_tracker = ReconstructionAccuracy('acc')
         self.nnn = nnn
 
     @property
@@ -308,12 +307,10 @@ class SOM(tf.keras.models.Model):
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
         self.loss_tracker.update_state(loss)
         self.re_tracker.update_state(tf.reduce_mean(rec_errors))
-        self.acc_tracker.update_state(y, losses)
 
         return {
             "loss": self.loss_tracker.result(),
-            "re": self.re_tracker.result(),
-            "acc": self.acc_tracker.result()
+            "re": self.re_tracker.result()
         }
 
     def test_step(self, data):
@@ -373,12 +370,10 @@ class SOM(tf.keras.models.Model):
 
         self.loss_tracker.update_state(loss)
         self.re_tracker.update_state(tf.reduce_mean(rec_errors))
-        self.acc_tracker.update_state(y, losses)
 
         return {
             "loss": self.loss_tracker.result(),
-            "re": self.re_tracker.result(),
-            "acc": self.acc_tracker.result()
+            "re": self.re_tracker.result()
         }
 
 class EarlyStoppingAtMaxMetric(tf.keras.callbacks.Callback):
@@ -442,6 +437,7 @@ class EarlyStoppingAtMaxMetric(tf.keras.callbacks.Callback):
         else:
             raise NotImplemented
         print(f'\nValidation {self.metric}:', self.current)
+        print(self.model)
 
 class ReconstructionAccuracy(tf.keras.metrics.Metric):
 

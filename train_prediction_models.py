@@ -225,8 +225,7 @@ if __name__ == '__main__':
                 if ae:
                     x_val = np.hstack([np.expand_dims(Xtv[stages[1]][f], 1) for f in features_selected])
                     y_val = Ytv[stages[1]][br_key]
-                    #es_callback = EarlyStoppingAtMaxMetric(validation_data=[x_val, y_val], metric='acc', patience=patience)
-                    es_callback = tf.keras.callbacks.EarlyStopping(monitor='val_acc', patience=patience, mode='max', restore_best_weights=True)
+                    es_callback = EarlyStoppingAtMaxMetric(validation_data=[x_val, y_val], metric='acc', patience=patience)
                 else:
                     es_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=patience, mode='min', restore_best_weights=True)
 
