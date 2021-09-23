@@ -161,6 +161,7 @@ class SOM(tf.keras.models.Model):
         self.niterations = niterations
         self.current_iteration = 0
         self.loss_tracker = tf.keras.metrics.Mean(name='loss')
+        self.re_tracker = tf.keras.metrics.Mean(name='re')
         self.nnn = nnn
 
     @property
@@ -300,8 +301,11 @@ class SOM(tf.keras.models.Model):
         grads = tape.gradient(loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
         self.loss_tracker.update_state(loss)
+        self.re_tracker.update_state(rec_error)
+
         return {
-            "loss": self.loss_tracker.result()
+            "loss": self.loss_tracker.result(),
+            "re": self.re_tracker.result()
         }
 
     def test_step(self, data):
@@ -354,7 +358,11 @@ class SOM(tf.keras.models.Model):
         w_batch = self.neighborhood_function(self.map_dist(y_pred), self.T)
         rec_error = tf.reduce_mean(tf.math.sqrt(tf.reduce_sum(tf.square(x - x_rec), axis=-1)), axis=-1)
         loss = som_loss(w_batch, d) + rec_error
+
         self.loss_tracker.update_state(loss)
+        self.re_tracker.update_state(rec_error)
+
         return {
-            "loss": self.loss_tracker.result()
+            "loss": self.loss_tracker.result(),
+            "re": self.re_tracker.result()
         }
