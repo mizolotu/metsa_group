@@ -152,7 +152,7 @@ class SOM(tf.keras.models.Model):
         self.T_max = T_max
         self.niterations = niterations
         self.current_iteration = 0
-        self.total_loss_tracker = tf.keras.metrics.Mean(name='total_loss')
+        self.loss_tracker = tf.keras.metrics.Mean(name='loss')
         self.nnn = nnn
 
         self.inputs = {colname: tf.keras.layers.Input(name=f'input_{colname}', shape=(1,), dtype=tf.float32) for colname in self.features}
@@ -259,7 +259,7 @@ class SOM(tf.keras.models.Model):
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
         self.total_loss_tracker.update_state(loss)
         return {
-            "total_loss": self.total_loss_tracker.result()
+            "loss": self.loss_tracker.result()
         }
 
     def test_step(self, data):
@@ -293,7 +293,7 @@ class SOM(tf.keras.models.Model):
         y_pred = tf.math.argmin(d, axis=1)
         w_batch = self.neighborhood_function(self.map_dist(y_pred), self.T)
         loss = som_loss(w_batch, d)
-        self.total_loss_tracker.update_state(loss)
+        self.loss_tracker.update_state(loss)
         return {
-            "total_loss": self.total_loss_tracker.result()
+            "loss": self.loss_tracker.result()
         }
