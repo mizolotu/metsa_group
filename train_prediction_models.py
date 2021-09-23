@@ -135,6 +135,10 @@ if __name__ == '__main__':
             np.random.shuffle(inds)
             val, remaining = np.split(inds, [int(validation_share * len(inds))])
             tr, te = np.split(remaining, [int(train_test_ratio * len(remaining))])
+            print(len(tr))
+            if ae:
+                tr = tr[np.where((labels[tr] >= br_min) & (labels[tr] <= br_max))[0]]
+            print(len(tr))
             if args.mode == 'production':
                 tr = np.hstack([tr, val])
                 val = te.copy()
