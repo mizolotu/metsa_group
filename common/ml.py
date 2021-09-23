@@ -133,7 +133,7 @@ def som_loss(weights, distances):
 
 class SOM(tf.keras.models.Model):
 
-    def __init__(self, map_size, features, xmin, xmax, nfeatures, split_neurons=256, cnn_filters=[256, 512, 1024], T_min=0.1, T_max=10.0, niterations=10000, nnn=4, batchnorm=False, eps=1e-10):
+    def __init__(self, map_size, features, xmin, xmax, nfeatures, split_neurons=256, encoder_filters=[256, 512, 1024], decoder_filters=256, T_min=0.1, T_max=10.0, niterations=10000, nnn=4, batchnorm=False, eps=1e-10):
         super(SOM, self).__init__()
 
         self.map_size = map_size
@@ -142,6 +142,8 @@ class SOM(tf.keras.models.Model):
         self.xmax = xmax
         self.nfeatures = nfeatures
         self.batchnorm = batchnorm
+        self.encoder_filters = encoder_filters
+        self.decoder_filters = decoder_filters
         self.eps = eps
 
         self.nprototypes = np.prod(map_size)
@@ -149,6 +151,10 @@ class SOM(tf.keras.models.Model):
         mg = np.meshgrid(*ranges, indexing='ij')
         self.prototype_coordinates = tf.convert_to_tensor(np.array([item.flatten() for item in mg]).T)
         self.split_layer = [tf.keras.layers.Dense(split_neurons, activation='relu') for _ in self.nfeatures]
+        self.unsplit_layer = [tf.keras.layers.Dense(nf, activation='relu') for nf in self.nfeatures]
+        self.cnn_encoder = [tf.keras.layers.Conv1D(nf, 2, activation='relu', padding='same') for nf in self.encoder_filters[:-1]]
+        self.cnn_encoder.append(tf.keras.layers.Conv1D(self.encoder_filters[-1], len(self.nfeatures), activation='relu'))
+        self.cnn_decoder = [tf.keras.layers.Conv1DTranspose(decoder_filters, 2, activation='relu') for _ in self.nfeatures[:-1]]
         self.som_layer = SOMLayer(map_size, name='som_layer')
         self.T_min = T_min
         self.T_max = T_max
@@ -160,10 +166,6 @@ class SOM(tf.keras.models.Model):
     @property
     def prototypes(self):
         return self.som_layer.get_weights()[0]
-
-    #def build(self, input_shape):
-    #    self.input_spec = [tf.keras.layers.InputSpec(shape=(None, 1), dtype=tf.float32) for _ in input_shape]
-    #    self.built = True
 
     def call(self, x):
 
@@ -181,15 +183,31 @@ class SOM(tf.keras.models.Model):
 
         # standardize the input
 
-        inputs_std = (inputs_without_nan - self.xmin) / (self.xmax - self.xmin + self.eps)
+        x = (inputs_without_nan - self.xmin) / (self.xmax - self.xmin + self.eps)
 
         # split
 
-        x_tmp = tf.split(inputs_std, self.nfeatures, axis=-1)
+        x_tmp = tf.split(x, self.nfeatures, axis=-1)
         x_spl = []
         for i, spl in enumerate(x_tmp):
             x_spl.append(self.split_layer[i](spl))
         x_spl = tf.stack(x_spl, axis=-2)
+
+        # encoding
+
+        for layer in self.cnn_encoder:
+            x_spl = layer(x_spl)
+
+        # decoding
+
+        x_rec = x_spl
+        for layer in self.cnn_decoder:
+            x_rec = layer(x_rec)
+        x_tmp = tf.split(x_rec, len(self.nfeatures), axis=1)
+        x_rec = []
+        for i, spl in enumerate(x_tmp):
+            x_rec.append(tf.keras.layers.Flatten()(self.unsplit_layer[i](spl)))
+        x_rec = tf.concat(x_rec, axis=-1)
 
         # cluster
 
@@ -197,7 +215,12 @@ class SOM(tf.keras.models.Model):
         s = tf.sort(c, axis=1)
         spl = tf.split(s, [self.nnn, self.nprototypes - self.nnn], axis=1)
 
-        return tf.reduce_mean(spl[0], axis=1)
+        # error
+
+        cl_dist = tf.reduce_mean(spl[0], axis=1)
+        rec_error = tf.reduce_mean(tf.math.sqrt(tf.reduce_sum(tf.square(x - x_rec), axis=-1)), axis=-1)
+
+        return cl_dist + rec_error
 
     def map_dist(self, y_pred):
         labels = tf.gather(self.prototype_coordinates, y_pred)
@@ -227,15 +250,31 @@ class SOM(tf.keras.models.Model):
 
             # standardize the input
 
-            inputs_std = (inputs_without_nan - self.xmin) / (self.xmax - self.xmin + self.eps)
+            x = (inputs_without_nan - self.xmin) / (self.xmax - self.xmin + self.eps)
 
             # split
 
-            x_tmp = tf.split(inputs_std, self.nfeatures, axis=-1)
+            x_tmp = tf.split(x, self.nfeatures, axis=-1)
             x_spl = []
             for i, spl in enumerate(x_tmp):
                 x_spl.append(self.split_layer[i](spl))
             x_spl = tf.stack(x_spl, axis=-2)
+
+            # encoding
+
+            for layer in self.cnn_encoder:
+                x_spl = layer(x_spl)
+
+            # decoding
+
+            x_rec = x_spl
+            for layer in self.cnn_decoder:
+                x_rec = layer(x_rec)
+            x_tmp = tf.split(x_rec, len(self.nfeatures), axis=1)
+            x_rec = []
+            for i, spl in enumerate(x_tmp):
+                x_rec.append(tf.keras.layers.Flatten()(self.unsplit_layer[i](spl)))
+            x_rec = tf.concat(x_rec, axis=-1)
 
             # compute cluster assignments for batches
 
@@ -255,7 +294,8 @@ class SOM(tf.keras.models.Model):
 
             # calculate loss
 
-            loss = som_loss(w_batch, d)
+            rec_error = tf.reduce_mean(tf.math.sqrt(tf.reduce_sum(tf.square(x - x_rec), axis=-1)), axis=-1)
+            loss = som_loss(w_batch, d) + rec_error
 
         grads = tape.gradient(loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
@@ -281,20 +321,39 @@ class SOM(tf.keras.models.Model):
 
         # standardize the input
 
-        inputs_std = (inputs_without_nan - self.xmin) / (self.xmax - self.xmin + self.eps)
+        x = (inputs_without_nan - self.xmin) / (self.xmax - self.xmin + self.eps)
 
         # split
 
-        x_tmp = tf.split(inputs_std, self.nfeatures, axis=-1)
+        x_tmp = tf.split(x, self.nfeatures, axis=-1)
         x_spl = []
         for i, spl in enumerate(x_tmp):
             x_spl.append(self.split_layer[i](spl))
         x_spl = tf.stack(x_spl, axis=-2)
 
+        # encoding
+
+        for layer in self.cnn_encoder:
+            x_spl = layer(x_spl)
+
+        # decoding
+
+        x_rec = x_spl
+        for layer in self.cnn_decoder:
+            x_rec = layer(x_rec)
+        x_tmp = tf.split(x_rec, len(self.nfeatures), axis=1)
+        x_rec = []
+        for i, spl in enumerate(x_tmp):
+            x_rec.append(tf.keras.layers.Flatten()(self.unsplit_layer[i](spl)))
+        x_rec = tf.concat(x_rec, axis=-1)
+
+        # clustering
+
         d = self.som_layer(x_spl)
         y_pred = tf.math.argmin(d, axis=1)
         w_batch = self.neighborhood_function(self.map_dist(y_pred), self.T)
-        loss = som_loss(w_batch, d)
+        rec_error = tf.reduce_mean(tf.math.sqrt(tf.reduce_sum(tf.square(x - x_rec), axis=-1)), axis=-1)
+        loss = som_loss(w_batch, d) + rec_error
         self.loss_tracker.update_state(loss)
         return {
             "loss": self.loss_tracker.result()
