@@ -406,6 +406,7 @@ class EarlyStoppingAtMaxMetric(tf.keras.callbacks.Callback):
 
     def on_test_end(self, logs):
         x, y = self.validation_data
+        y = y[self.model.target]
         predictions = self.model.predict(x)
         probs = predictions.flatten()
         if self.metric == 'auc':
