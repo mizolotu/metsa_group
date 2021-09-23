@@ -215,8 +215,9 @@ if __name__ == '__main__':
                 if args.verbose and k == 0:
                     print(model_summary)
 
-                print(model.inputs)
-                print(model.input_spec)
+                #print(model.inputs)
+                #print(model.input_spec)
+                #print(model.input_shape)
 
                 model.fit(
                     Xtv[stages[0]], Ytv[stages[0]],

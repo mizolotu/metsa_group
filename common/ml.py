@@ -77,7 +77,7 @@ def cnn1lstm(hidden, nfilters=[1280, 1280], kernel_size=2, nhidden=640):
 
 def som(features, xmin, xmax, nfeatures, layers=[64, 64], lr=1e-6):
     model = SOM(layers, features, xmin, xmax, nfeatures)
-    model.build(features)
+    model.build(input_shape={f: (None, 1) for f in features})
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
     return model
 
@@ -160,17 +160,15 @@ class SOM(tf.keras.models.Model):
     def prototypes(self):
         return self.som_layer.get_weights()[0]
 
-    def build(self, input_shape):
-        self.inputs = {colname: tf.keras.layers.Input(name=f'input_{colname}', shape=(1,), dtype=tf.float32) for colname in input_shape}
-        self.input_spec = [{colname: tf.keras.layers.InputSpec(shape=(1,), dtype=tf.float32)} for colname in input_shape]
-        self.built = True
+    #def build(self, input_shape):
+    #    self.input_spec = [tf.keras.layers.InputSpec(shape=(None, 1), dtype=tf.float32) for _ in input_shape]
+    #    self.built = True
 
     def call(self, x):
 
         # input
 
-        x = self.inputs(x)
-        x = tf.keras.layers.Concatenate(axis=-1)([tf.expand_dims(x[f], -1) for f in self.features])
+        x = tf.keras.layers.Concatenate(axis=-1)([x[f] for f in self.features])
 
         # deal with nans
 
