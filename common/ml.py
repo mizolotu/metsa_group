@@ -76,7 +76,7 @@ def cnn1lstm(hidden, nfilters=[1280, 1280], kernel_size=2, nhidden=640):
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
-def som(features, xmin, xmax, nfeatures, target, layers=[64, 64], lr=1e-6):
+def som(features, xmin, xmax, nfeatures, target, layers=[64, 64], lr=1e-4):
     model = SOM(layers, features, xmin, xmax, nfeatures, target)
     model.build(input_shape={f: (None, 1) for f in features})
     model.compute_output_shape({f: (None, 1) for f in features})
