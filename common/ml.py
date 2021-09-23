@@ -78,6 +78,7 @@ def cnn1lstm(hidden, nfilters=[1280, 1280], kernel_size=2, nhidden=640):
 def som(features, xmin, xmax, nfeatures, layers=[64, 64], lr=1e-6):
     model = SOM(layers, features, xmin, xmax, nfeatures)
     model.build(input_shape={f: (None, 1) for f in features})
+    model.compute_output_shape({f: (None, 1) for f in features})
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
     return model
 
