@@ -215,13 +215,9 @@ if __name__ == '__main__':
                 if args.verbose and k == 0:
                     print(model_summary)
 
-                #print(model.inputs)
-                #print(model.input_spec)
-                #print(model.input_shape)
-
                 model.fit(
                     Xtv[stages[0]], Ytv[stages[0]],
-                    validation_data=(Xtv[stages[1]], Ytv[stages[1]]),  # Wtv[stages[1]]
+                    validation_data=(Xtv[stages[1]], Ytv[stages[1]]),
                     epochs=epochs,
                     verbose=args.verbose,
                     batch_size=batch_size,
@@ -242,7 +238,11 @@ if __name__ == '__main__':
 
             # calculate prediction error for non-permuted features of the class combination
 
-            predictions = model.predict(Xi)[br_key].flatten()
+            predictions = model.predict(Xi)
+            if ae:
+                print(predictions)
+            else:
+                predictions = predictions[br_key].flatten()
             assert len(predictions) == len(Yi)
 
             min_errors[k] = np.min(np.abs(Yi - predictions))
