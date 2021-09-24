@@ -8,7 +8,7 @@ import argparse as arp
 
 from config import *
 from common.utils import set_seeds, load_meta, load_data, pad_data
-from common.ml import model_input, split, mlp, cnn1, lstm, bilstm, cnn1lstm, model_output, som, EarlyStoppingAtMaxMetric
+from common.ml import model_input, split, mlp, cnn1, lstm, bilstm, cnn1lstm, model_output, som, EarlyStoppingAtMaxAUC
 
 if __name__ == '__main__':
 
@@ -225,7 +225,7 @@ if __name__ == '__main__':
                 if ae:
                     x_val = np.hstack([np.expand_dims(Xtv[stages[1]][f], 1) for f in features_selected])
                     y_val = Ytv[stages[1]][br_key]
-                    es_callback = EarlyStoppingAtMaxMetric(validation_data=(Xtv[stages[1]], Ytv[stages[1]]), metric='acc', patience=patience)
+                    es_callback = EarlyStoppingAtMaxAUC(validation_data=(Xtv[stages[1]], Ytv[stages[1]]), patience=patience)
                 else:
                     es_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=patience, mode='min', restore_best_weights=True)
                 model.fit(
@@ -247,7 +247,7 @@ if __name__ == '__main__':
 
             predictions = model.predict(Xi)
             if ae:
-                print(predictions)
+                predictions = predictions
             else:
                 predictions = predictions[br_key].flatten()
             assert len(predictions) == len(Yi)

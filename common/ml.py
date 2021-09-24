@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
-from config import nan_value
+from config import nan_value, threshold_variable_name
 from sklearn.metrics import roc_auc_score
 
 def model_input(features, xmin, xmax, steps=1, batchnorm=False, eps=1e-10):
@@ -49,7 +49,7 @@ def mlp(hidden, nhiddens=[2048, 2048], dropout=0.5):
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
     return hidden
 
-def cnn1(hidden, nhiddens=[512, 1024], nfilters=1024, kernel_size=2):
+def cnn1(hidden, nhiddens=[256, 512], nfilters=1024, kernel_size=2):
     last_conv_kernel_size = hidden.shape[-2]
     for nhidden in nhiddens:
         hidden = tf.keras.layers.Conv1D(nhidden, kernel_size, padding='same', activation='relu')(hidden)
@@ -158,6 +158,8 @@ class SOM(tf.keras.models.Model):
         self.cnn_encoder.append(tf.keras.layers.Conv1D(self.encoder_filters[-1], len(self.nfeatures), activation='relu'))
         self.cnn_decoder = [tf.keras.layers.Conv1DTranspose(decoder_filters, 2, activation='relu') for _ in self.nfeatures[:-1]]
         self.som_layer = SOMLayer(map_size, name='som_layer')
+        self.threshold = self.add_weight(shape=(), name=threshold_variable_name)
+
         self.T_min = T_min
         self.T_max = T_max
         self.niterations = niterations
@@ -381,26 +383,31 @@ class SOM(tf.keras.models.Model):
             'cl': self.cl_tracker.result()
         }
 
-class EarlyStoppingAtMaxMetric(tf.keras.callbacks.Callback):
+class EarlyStoppingAtMaxAUC(tf.keras.callbacks.Callback):
 
-    def __init__(self, validation_data, metric, patience=10, max_fpr=1.0):
-        super(EarlyStoppingAtMaxMetric, self).__init__()
+    def __init__(self, validation_data, patience=10, max_fpr=1.0):
+        super(EarlyStoppingAtMaxAUC, self).__init__()
         self.patience = patience
         self.best_weights = None
-        self.metric = metric
         self.validation_data = validation_data
-        self.current = -np.Inf
+        self.mtr_current = -np.Inf
         self.max_fpr = max_fpr
+        self.thr_variable = None
 
     def on_train_begin(self, logs=None):
         self.wait = 0
         self.stopped_epoch = 0
-        self.best = -np.Inf
+        self.mtr_best = -np.Inf
+        if self.thr_variable is None:
+            thr_variable = [v for v in self.model.variables if v.name.startswith(threshold_variable_name)]
+            assert len(thr_variable) == 1
+            self.thr_variable = thr_variable[0]
 
     def on_epoch_end(self, epoch, logs=None):
-        if np.greater(self.current, self.best):
-            self.best = self.current
+        if np.greater(self.mtr_current, self.mtr_best):
+            self.mtr_best = self.mtr_current
             self.wait = 0
+            self.thr_variable.assign(self.thr_current)
             self.best_weights = self.model.get_weights()
         else:
             self.wait += 1
@@ -408,38 +415,38 @@ class EarlyStoppingAtMaxMetric(tf.keras.callbacks.Callback):
                 self.stopped_epoch = epoch
                 self.model.stop_training = True
                 self.model.set_weights(self.best_weights)
+                print(self.thr_variable)
 
     def on_test_end(self, logs):
         x, y = self.validation_data
         y = y[self.model.target]
         predictions = self.model.predict(x)
         probs = predictions.flatten()
-        if self.metric == 'auc':
-            self.current = roc_auc_score(y, probs, max_fpr=self.max_fpr)
-        elif self.metric == 'acc':
-            n = len(y)
-            p0 = probs[np.where(y == 0)[0]]
-            p1 = probs[np.where(y == 1)[0]]
-            p0si = np.argsort(p0)
-            p1si = np.argsort(p1)
-            p0s = p0[p0si]
-            p1s = p1[p1si]
-            n0 = len(p0s)
-            n1 = len(p1s)
-            if p1s[0] > p0s[-1]:
-                acc = [1]
-            else:
-                idx = np.where(p0s > p1s[0])[0]
-                acc = [float(len(p0s) - len(idx) + len(p1s)) / n, *np.zeros(len(idx))]
-                h = n0 - len(idx)
-                n10 = 0
-                for i, j in enumerate(idx):
-                    thr = p0s[j]
-                    thridx = np.where(p1s[n10:] < thr)[0]
-                    n10 += len(thridx)
-                    h += 1
-                    acc[i + 1] = (h - n10 + n1) / n
-            self.current = np.max(acc)
+        self.mtr_current = roc_auc_score(y, probs, max_fpr=self.max_fpr)
+        n = len(y)
+        p0 = probs[np.where(y == 0)[0]]
+        p1 = probs[np.where(y == 1)[0]]
+        p0si = np.argsort(p0)
+        p1si = np.argsort(p1)
+        p0s = p0[p0si]
+        p1s = p1[p1si]
+        n0 = len(p0s)
+        n1 = len(p1s)
+        if p1s[0] > p0s[-1]:
+            acc = [1]
+            thr = [(p1s[0] + p0s[-1]) / 2]
         else:
-            raise NotImplemented
-        print(f'\nValidation {self.metric}:', self.current)
+            idx = np.where(p0s > p1s[0])[0]
+            acc = [float(len(p0s) - len(idx) + len(p1s)) / n, *np.zeros(len(idx))]
+            thr = [p0s[idx[0] - 1]]
+            h = n0 - len(idx)
+            n10 = 0
+            for i, j in enumerate(idx):
+                thr.append(p0s[j])
+                thridx = np.where(p1s[n10:] < thr[-1])[0]
+                n10 += len(thridx)
+                h += 1
+                acc[i + 1] = (h - n10 + n1) / n
+        argmax = np.argmax(acc)
+        self.thr_current = thr[argmax]
+        print(f'\nValidation AUC: {self.mtr_current}, threshold: {self.thr_current}')
