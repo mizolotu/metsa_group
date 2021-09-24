@@ -49,7 +49,7 @@ def mlp(hidden, nhiddens=[2048, 2048], dropout=0.5):
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
     return hidden
 
-def cnn1(hidden, nhiddens=[256, 512], nfilters=1024, kernel_size=2):
+def cnn1(hidden, nhiddens=[512, 1024], nfilters=1024, kernel_size=2):
     last_conv_kernel_size = hidden.shape[-2]
     for nhidden in nhiddens:
         hidden = tf.keras.layers.Conv1D(nhidden, kernel_size, padding='same', activation='relu')(hidden)
