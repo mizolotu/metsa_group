@@ -253,8 +253,8 @@ if __name__ == '__main__':
                 prediction_labels = np.zeros_like(predictions)
                 prediction_labels[np.where(predictions > 1)[0]] = 1
                 accuracy = float(len(np.where(prediction_labels == Yi)[0])) / len(Yi)
-                tpr = float(len(np.where((prediction_labels > 0) & (Yi > 0))[0])) / len(np.where(Yi > 0)[0])[0]
-                fpr = float(len(np.where((prediction_labels > 0) & (Yi == 0))[0])) / len(np.where(Yi == 0)[0])[0]
+                tpr = float(len(np.where((prediction_labels > 0) & (Yi > 0))[0])) / len(np.where(Yi > 0)[0])
+                fpr = float(len(np.where((prediction_labels > 0) & (Yi == 0))[0])) / len(np.where(Yi == 0)[0])
                 print(f'Anomaly detection accuracy: {accuracy}')
                 print(f'Anomaly detection FPR: {tpr}')
                 print(f'Anomaly detection TPR: {fpr}')
