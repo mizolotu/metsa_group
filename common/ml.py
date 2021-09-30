@@ -411,7 +411,6 @@ class EarlyStoppingAtMaxAUC(tf.keras.callbacks.Callback):
                 self.stopped_epoch = epoch
                 self.model.stop_training = True
                 self.model.set_weights(self.best_weights)
-        print(self.model.threshold)
 
     def on_test_end(self, logs):
         x, y = self.validation_data
