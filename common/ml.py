@@ -4,6 +4,9 @@ import numpy as np
 from config import nan_value, threshold_variable_name
 from sklearn.metrics import roc_auc_score
 
+def roc_auc(labels, preds, fpr=1):
+    return roc_auc_score(labels, preds, max_fpr=fpr)
+
 def model_input(features, xmin, xmax, steps=1, batchnorm=False, eps=1e-10):
 
     # input layer
@@ -134,7 +137,7 @@ def som_loss(weights, distances):
 
 class SOM(tf.keras.models.Model):
 
-    def __init__(self, map_size, features, xmin, xmax, nfeatures, target, split_neurons=256, encoder_filters=[256, 512, 1024], decoder_filters=256, T_min=0.1, T_max=10.0, niterations=10000, nnn=4, batchnorm=False, eps=1e-10):
+    def __init__(self, map_size, features, xmin, xmax, nfeatures, target, split_neurons=256, cnn_filters=256, latent_dim=512, T_min=0.1, T_max=10.0, niterations=10000, nnn=4, batchnorm=False, eps=1e-10):
         super(SOM, self).__init__()
 
         self.map_size = map_size
@@ -144,8 +147,7 @@ class SOM(tf.keras.models.Model):
         self.xmax = xmax
         self.nfeatures = nfeatures
         self.batchnorm = batchnorm
-        self.encoder_filters = encoder_filters
-        self.decoder_filters = decoder_filters
+        self.cnn_filters = cnn_filters
         self.eps = eps
 
         self.nprototypes = np.prod(map_size)
@@ -154,9 +156,10 @@ class SOM(tf.keras.models.Model):
         self.prototype_coordinates = tf.convert_to_tensor(np.array([item.flatten() for item in mg]).T)
         self.split_layer = [tf.keras.layers.Dense(split_neurons, activation='relu') for _ in self.nfeatures]
         self.unsplit_layer = [tf.keras.layers.Dense(nf, activation='relu') for nf in self.nfeatures]
-        self.cnn_encoder = [tf.keras.layers.Conv1D(nf, 2, activation='relu', padding='same') for nf in self.encoder_filters[:-1]]
-        self.cnn_encoder.append(tf.keras.layers.Conv1D(self.encoder_filters[-1], len(self.nfeatures), activation='relu'))
-        self.cnn_decoder = [tf.keras.layers.Conv1DTranspose(decoder_filters, 2, activation='relu') for _ in self.nfeatures[:-1]]
+        self.cnn_encoder = [tf.keras.layers.Conv1D(nf, 2, activation='relu', padding='same') for nf in self.cnn_filters[:-1]]
+        self.cnn_encoder.append(tf.keras.layers.Conv1D(self.cnn_filters[-1], len(self.nfeatures), activation='relu'))
+        self.latent = tf.keras.layers.Dense(latent_dim, activation='relu')
+        self.cnn_decoder = [tf.keras.layers.Conv1DTranspose(nf, 2, activation='relu') for nf in self.nfeatures[:-1]]
         self.som_layer = SOMLayer(map_size, name='som_layer')
         self.threshold = self.add_weight(shape=(), name=threshold_variable_name, initializer=tf.keras.initializers.Ones())
 
