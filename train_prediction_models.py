@@ -247,7 +247,7 @@ if __name__ == '__main__':
 
             predictions = model.predict(Xi)
             if ae:
-                predictions = predictions
+                predictions = predictions / model.threshold
             else:
                 predictions = predictions[br_key].flatten()
             assert len(predictions) == len(Yi)

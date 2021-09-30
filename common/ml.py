@@ -158,7 +158,7 @@ class SOM(tf.keras.models.Model):
         self.cnn_encoder.append(tf.keras.layers.Conv1D(self.encoder_filters[-1], len(self.nfeatures), activation='relu'))
         self.cnn_decoder = [tf.keras.layers.Conv1DTranspose(decoder_filters, 2, activation='relu') for _ in self.nfeatures[:-1]]
         self.som_layer = SOMLayer(map_size, name='som_layer')
-        self.threshold = self.add_weight(shape=(), name=threshold_variable_name)
+        self.threshold = self.add_weight(shape=(), name=threshold_variable_name, initializer=tf.keras.initializers.Ones())
 
         self.T_min = T_min
         self.T_max = T_max
@@ -398,16 +398,12 @@ class EarlyStoppingAtMaxAUC(tf.keras.callbacks.Callback):
         self.wait = 0
         self.stopped_epoch = 0
         self.mtr_best = -np.Inf
-        if self.thr_variable is None:
-            thr_variable = [v for v in self.model.variables if v.name.startswith(threshold_variable_name)]
-            assert len(thr_variable) == 1
-            self.thr_variable = thr_variable[0]
 
     def on_epoch_end(self, epoch, logs=None):
+        self.model.threshold.assign(self.thr_current)
         if np.greater(self.mtr_current, self.mtr_best):
             self.mtr_best = self.mtr_current
             self.wait = 0
-            self.thr_variable.assign(self.thr_current)
             self.best_weights = self.model.get_weights()
         else:
             self.wait += 1
@@ -415,7 +411,7 @@ class EarlyStoppingAtMaxAUC(tf.keras.callbacks.Callback):
                 self.stopped_epoch = epoch
                 self.model.stop_training = True
                 self.model.set_weights(self.best_weights)
-                print(self.thr_variable)
+        print(self.model.threshold)
 
     def on_test_end(self, logs):
         x, y = self.validation_data
