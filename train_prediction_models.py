@@ -246,26 +246,34 @@ if __name__ == '__main__':
             # calculate prediction error for non-permuted features of the class combination
 
             predictions = model.predict(Xi)
-            if ae:
-                predictions = predictions / model.threshold
-            else:
-                predictions = predictions[br_key].flatten()
             assert len(predictions) == len(Yi)
 
-            min_errors[k] = np.min(np.abs(Yi - predictions))
-            mean_errors[k] = np.mean(np.abs(Yi - predictions))
-            max_errors[k] = np.max(np.abs(Yi - predictions))
-            max_i = np.argmax(np.abs(Yi - predictions))
-            print(f'Max error prediction: {predictions[max_i]}, the real value: {Yi[max_i]}')
+            if ae:
+                predictions = predictions / model.threshold
+                prediction_labels = np.zeros_like(predictions)
+                prediction_labels[np.where(predictions > 1)[0]] = 1
+                accuracy = float(len(np.where(prediction_labels == Yi)[0])) / len(Yi)
+                tpr = float(len(np.where((prediction_labels > 0) & (Yi > 0))[0])) / len(np.where(Yi > 0)[0])[0]
+                fpr = float(len(np.where((prediction_labels > 0) & (Yi == 0))[0])) / len(np.where(Yi == 0)[0])[0]
+                print(f'Anomaly detection accuracy: {accuracy}')
+                print(f'Anomaly detection FPR: {tpr}')
+                print(f'Anomaly detection TPR: {fpr}')
+            else:
+                predictions = predictions[br_key].flatten()
+                min_errors[k] = np.min(np.abs(Yi - predictions))
+                mean_errors[k] = np.mean(np.abs(Yi - predictions))
+                max_errors[k] = np.max(np.abs(Yi - predictions))
+                max_i = np.argmax(np.abs(Yi - predictions))
+                print(f'Max error prediction: {predictions[max_i]}, the real value: {Yi[max_i]}')
 
-            errors.extend(np.abs(Yi - predictions))
-            reals.extend(Yi)
-            tsteps.extend(Ti)
-            preds.extend(predictions)
+                errors.extend(np.abs(Yi - predictions))
+                reals.extend(Yi)
+                tsteps.extend(Ti)
+                preds.extend(predictions)
 
-            print(f'Mean absolute prediction error for combination {model_dc_comb}: {mean_errors[k]}')
-            print(f'Min absolute prediction error for combination {model_dc_comb}: {min_errors[k]}')
-            print(f'Max absolute prediction error for combination {model_dc_comb}: {max_errors[k]}')
+                print(f'Mean absolute prediction error for combination {model_dc_comb}: {mean_errors[k]}')
+                print(f'Min absolute prediction error for combination {model_dc_comb}: {min_errors[k]}')
+                print(f'Max absolute prediction error for combination {model_dc_comb}: {max_errors[k]}')
 
             # calculate prediction error for features permuted
 
@@ -319,14 +327,18 @@ if __name__ == '__main__':
 
         # save results
 
-        assert model_dc_comb in tbl_dc_combs
-        idx = tbl_dc_combs.index(model_dc_comb)
-        p_e_mean[model_type].values[idx] = np.mean(mean_errors)
-        p_e_mean.to_csv(mean_e_path, index=None)
-        p_e_min[model_type].values[idx] = np.mean(min_errors)
-        p_e_min.to_csv(min_e_path, index=None)
-        p_e_max[model_type].values[idx] = np.mean(max_errors)
-        p_e_max.to_csv(max_e_path, index=None)
+        if ae:
+            pass
 
-        pr[model_name] = preds
-        pr.to_csv(r_path, index=None)
+        else:
+            assert model_dc_comb in tbl_dc_combs
+            idx = tbl_dc_combs.index(model_dc_comb)
+            p_e_mean[model_type].values[idx] = np.mean(mean_errors)
+            p_e_mean.to_csv(mean_e_path, index=None)
+            p_e_min[model_type].values[idx] = np.mean(min_errors)
+            p_e_min.to_csv(min_e_path, index=None)
+            p_e_max[model_type].values[idx] = np.mean(max_errors)
+            p_e_max.to_csv(max_e_path, index=None)
+
+            pr[model_name] = preds
+            pr.to_csv(r_path, index=None)
