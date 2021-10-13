@@ -83,3 +83,13 @@ def interpolate(x, xp, yp):
         if len(idx) > 0:
             y_interpolated[:, i] = np.interp(x, xp[idx], yp[idx, i])
     return y_interpolated
+
+def substitute_nan_values(X):
+    xmin = np.nanmin(X, 0)
+    xmax = np.nanmax(X, 0)
+    masks = xmin - (xmax - xmin)
+    is_nan = np.isnan(X)
+    inputs_without_nan = X * ~is_nan
+    inputs_without_nan[is_nan] = 0
+    inputs_without_nan += masks * is_nan
+    return inputs_without_nan

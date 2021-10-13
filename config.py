@@ -10,13 +10,19 @@ functions_dir = 'functions'
 tags_fname = 'tags.xlsx'
 features_fname = 'features.csv'
 meta_fname = 'metainfo.json'
-#correlation_csv = 'correlation.csv'
+
+xx_pearson_correlation_csv = 'feature_vs_feature_pearson_correlation.csv'
+xx_spearman_correlation_csv = 'feature_vs_feature_spearman_correlation.csv'
+xy_correlation_csv = 'feature_vs_target_correlation.csv'
+
 #prediction_error_csv = 'prediction_error.csv'
 #permutation_error_csv = 'permutation_error.csv'
+
 prediction_results_fname = 'prediction_results.csv'
 prediction_mean_errors_fname = 'prediction_mean_errors.csv'
 prediction_min_errors_fname = 'prediction_min_errors.csv'
 prediction_max_errors_fname = 'prediction_max_errors.csv'
+
 summary_txt = 'summary.txt'
 example_samples_fname = 'example.json'
 test_samples_fname = 'test_samples.csv'
