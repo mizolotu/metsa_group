@@ -16,13 +16,13 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train prediction models')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-e', '--extractor', help='Feature extractor', default='som', choices=['mlp', 'cnn1', 'lstm', 'bilstm', 'cnn1lstm', 'som'])
-    parser.add_argument('-c', '--classes', help='Delay class when prediction starts', type=int, nargs='+', default=[4, 5])
+    parser.add_argument('-e', '--extractor', help='Feature extractor', default='lstm', choices=['mlp', 'cnn1', 'lstm', 'bilstm', 'cnn1lstm', 'som'])
+    parser.add_argument('-c', '--classes', help='Delay class when prediction starts', type=int, nargs='+', default=[1, 2, 3, 4, 5])
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=seed)
-    parser.add_argument('-g', '--gpu', help='GPU to use')
-    parser.add_argument('-v', '--verbose', help='Verbose', default=False, type=bool)
+    parser.add_argument('-g', '--gpu', help='GPU to use', default='0')
+    parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
     parser.add_argument('-y', '--ylimits', help='Use bleach ratio limits from data?', default=False, type=bool)
-    parser.add_argument('-r', '--retrain', help='Retrain model?', default=False, type=bool)
+    parser.add_argument('-r', '--retrain', help='Retrain model?', default=True, type=bool)
     parser.add_argument('-n', '--ntests', help='Number of tests', type=int, default=1)
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=modes)
     args = parser.parse_args()
@@ -30,7 +30,7 @@ if __name__ == '__main__':
     # model input layer
 
     feature_extractor = args.extractor
-    if feature_extractor in ['som']:
+    if feature_extractor in ae_models:
         ae = True
     else:
         ae = False
@@ -174,7 +174,6 @@ if __name__ == '__main__':
             Xtv, Ytv = {}, {}
             for stage in stages[:-1]:
                 Xtv[stage], Ytv[stage] = {}, {}
-                #Xtmp = pad_data(values_k[stage], features_selected, features, classes, model_dc_comb)
                 Xtmp = values_k[stage]
                 if len(Xtmp.shape) == 2:
                     for i, fs in enumerate(features_selected):
@@ -209,7 +208,8 @@ if __name__ == '__main__':
                 print(f'Training new model {model_name}:')
 
                 if ae:
-                    model = som(features_selected, xmin, xmax, nfeatures, br_key)
+                    extractor_type = locals()[feature_extractor]
+                    model = extractor_type(features_selected, xmin, xmax, nfeatures, br_key)
                 else:
                     inputs, inputs_processed = model_input(features_selected, xmin, xmax, steps)
                     hidden = split(inputs_processed, nfeatures)
@@ -228,6 +228,7 @@ if __name__ == '__main__':
                     es_callback = EarlyStoppingAtMaxAUC(validation_data=(Xtv[stages[1]], Ytv[stages[1]]), patience=patience)
                 else:
                     es_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=patience, mode='min', restore_best_weights=True)
+
                 model.fit(
                     Xtv[stages[0]], Ytv[stages[0]],
                     validation_data=(Xtv[stages[1]], Ytv[stages[1]]),
@@ -246,7 +247,6 @@ if __name__ == '__main__':
             # calculate prediction error for non-permuted features of the class combination
 
             predictions = model.predict(Xi)
-            assert len(predictions) == len(Yi)
 
             if ae:
                 print(f'Anomaly detection ROC AUC (FPR=100 %): {roc_auc(Yi, predictions, fpr=1)}')

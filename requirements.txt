@@ -2,7 +2,7 @@ pandas
 numpy
 sklearn
 scipy
-tensorflow==2.5.1
+tensorflow==2.5.0
 openpyxl
 python-dateutil
 matplotlib

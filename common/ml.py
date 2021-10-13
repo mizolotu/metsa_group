@@ -21,7 +21,7 @@ def model_input(features, xmin, xmax, steps=1, batchnorm=False, eps=1e-10):
     # deal with nans
 
     is_nan = tf.math.is_nan(hidden)
-    masks = tf.dtypes.cast(-xmax, tf.float32)
+    masks = tf.dtypes.cast(xmin - (xmax - xmin), tf.float32)
     inputs_nan = tf.dtypes.cast(is_nan, dtype=tf.float32)
     inputs_not_nan = tf.dtypes.cast(tf.math.logical_not(is_nan), dtype=tf.float32)
     inputs_without_nan = tf.math.multiply_no_nan(hidden, inputs_not_nan) + tf.math.multiply_no_nan(masks, inputs_nan)
@@ -52,7 +52,7 @@ def mlp(hidden, nhiddens=[2048, 2048], dropout=0.5):
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
     return hidden
 
-def cnn1(hidden, nhiddens=[256, 512], nfilters=1024, kernel_size=2):
+def cnn1(hidden, nhiddens=[512, 1024], nfilters=1024, kernel_size=2):
     last_conv_kernel_size = hidden.shape[-2]
     for nhidden in nhiddens:
         hidden = tf.keras.layers.Conv1D(nhidden, kernel_size, padding='same', activation='relu')(hidden)
