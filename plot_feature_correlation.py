@@ -15,6 +15,7 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Plot feature correlation')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
+    parser.add_argument('-a', '--anonymize', help='Anonymize?', type=bool, default=False)
     args = parser.parse_args()
 
     # directories and meta
@@ -38,7 +39,14 @@ if __name__ == '__main__':
     for xx_name in [xx_pearson_correlation_csv, xx_spearman_correlation_csv]:
         xx_path = osp.join(task_results_dir, xx_name)
         values = pd.read_csv(xx_path, index_col=0).values
+        if args.anonymize:
+            postfix = '_anonymized'
+            names = [str(i) for i in range(len(features))]
+        else:
+            postfix = ''
+            names = features
         data[xx_name] = pd.DataFrame(np.abs(values), index=features, columns=features)
+
 
     # data frames and colormap
 
@@ -47,7 +55,7 @@ if __name__ == '__main__':
     # plot correlations
 
     for key in data:
-        fpath = osp.join(task_figures_dir, f'{key.split(csv)[0]}{pdf}')
+        fpath = osp.join(task_figures_dir, f'{key.split(csv)[0]}{postfix}{pdf}')
         pp.figure(figsize=(16, 12))
         sn.heatmap(data[key], cmap=cmap, xticklabels=1, yticklabels=1)
         pp.xlabel('Features', fontdict={'size': 12})

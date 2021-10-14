@@ -1,30 +1,37 @@
 import os
 import os.path as osp
-import pandas as pd
 import numpy as np
 import argparse as arp
 
 from config import *
-from calculate_prediction_error import load_meta
+from common.utils import load_meta, load_data
 from matplotlib import pyplot as pp
 
 if __name__ == '__main__':
 
     # args
 
-    parser = arp.ArgumentParser(description='Plot feature importance')
+    parser = arp.ArgumentParser(description='Plot feature values')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-f', '--feature', help='Feature to plot', default='126A0435-SI')
     parser.add_argument('-s', '--size', help='Fgiure size', default=12, type=int)
     parser.add_argument('-y', '--target', help='Target to plot feature against', default=br_key)
     parser.add_argument('-p', '--permute', help='Plot feature permuted?', type=bool, default=False)
-    parser.add_argument('-n', '--nfeatures', help='Number of features to plot', type=int, default=50000)
+    parser.add_argument('-n', '--npoints', help='Number of points to plot', type=int, default=5000)
+    parser.add_argument('-a', '--anonymize', help='Anonymize?', type=bool, default=False)
     args = parser.parse_args()
 
     # meta
 
-    meta = load_meta(processed_data_dir, args.task)
-    tags = meta['tags']
+    task_dir = osp.join(data_dir, args.task)
+    meta = load_meta(osp.join(task_dir, meta_fname))
+    features = meta['features']
+    classes = meta['classes']
+
+    # load data
+
+    values, labels, timestamps = load_data(osp.join(task_dir, features_fname), features)
+    nfeatures = len(features)
 
     # create output directory
 
@@ -33,46 +40,54 @@ if __name__ == '__main__':
         if not osp.isdir(dir):
             os.mkdir(dir)
 
-    # delay classes and tags
+    # x feature
 
-    tags_ = []
-    for key in sorted(tags.keys()):
-        tags_.extend(tags[key])
+    idx_x = features.index(args.feature)
+    x = values[:, idx_x]
+    idx_ = np.where(np.isnan(x) == False)[0]
+    print(len(idx_))
+    np.random.shuffle(idx_)
+    idx_ = idx_[:args.npoints]
+    print(len(idx_))
+    x = x[idx_]
 
-    # load data
-
-    vals = []
-    for stage in stages:
-        fpath = osp.join(processed_data_dir, f'{args.task}_{stage}{csv}')
-        p = pd.read_csv(fpath)
-        vals.append(p.values)
-    vals = np.vstack(vals)
-    X = vals[:, :-1]
-    nfeatures = X.shape[1]
-
-    # plot feature
+    # y feature
 
     if args.target == br_key:
-        y = vals[:, -1]
+        y = labels[idx_]
     else:
-        assert args.target in tags_
-        idxy = tags_.index(args.target)
-        y = X[:, idxy]
-    ymin = np.min(y)
-    assert args.feature in tags_
-    idx = tags_.index(args.feature)
-    x = X[:, idx]
-    idx_ = np.where((x != meta['xmin'][idx]) & (y[idx] != ymin))[0]
+        idx_y = features.index(args.target)
+        y = values[idx_, idx_y]
+
+    # anonymize
+
+    if args.anonymize:
+        postfix = '_anonymized'
+        xlabel = f'Feature {str(idx_x)}'
+        if args.target == br_key:
+            ylabel = 'Target'
+        else:
+            ylabel = f'Feature {idx_y}'
+    else:
+        postfix = ''
+        xlabel = features[idx_x]
+        ylabel = br_key
+
+    # file path
+
     fname = f'{args.feature}_vs_{args.target}'.replace('.', '_')
-    fpath = osp.join(task_figures_dir, f'{fname}{pdf}')
+    fpath = osp.join(task_figures_dir, f'{fname}{postfix}{pdf}')
+
+    # figure
+
     pp.figure(figsize=(args.size, args.size))
-    pp.plot(x[idx_[:args.nfeatures]], y[idx_[:args.nfeatures]], 'ko')
+    pp.plot(x, y, 'ko')
     if args.permute:
         idx_perm = np.arange(len(idx_))
         np.random.shuffle(idx_perm)
-        pp.plot(x[idx_[idx_perm[:args.nfeatures]]], y[idx_[:args.nfeatures]], 'kx')
-    pp.xlabel(args.feature, fontdict={'size': args.size})
-    pp.ylabel(br_key, fontdict={'size': args.size})
+        pp.plot(x[idx_perm], y, 'kx')
+    pp.xlabel(xlabel, fontdict={'size': args.size})
+    pp.ylabel(ylabel, fontdict={'size': args.size})
     pp.xticks(fontsize=args.size)
     pp.yticks(fontsize=args.size)
     pp.savefig(fpath, bbox_inches='tight')

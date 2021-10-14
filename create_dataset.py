@@ -17,7 +17,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--series', help='Extract as timeseries?', type=bool, default=False)
     args = parser.parse_args()
 
-    # laod delay classes
+    # load delay classes
 
     delay_classes_by_feature = {}
     try:
