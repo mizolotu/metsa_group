@@ -8,7 +8,7 @@ import argparse as arp
 
 from config import *
 from common.utils import set_seeds, load_meta, load_data, pad_data
-from common.ml import model_input, split, mlp, cnn1, lstm, bilstm, cnn1lstm, model_output, som, EarlyStoppingAtMaxAUC, roc_auc
+from common.ml import model_input, split, model_output, mlp, cnn1, lstm, bilstm, cnn1lstm, aen, som, EarlyStoppingAtMaxAUC, roc_auc
 
 if __name__ == '__main__':
 
@@ -16,15 +16,17 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train prediction models')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-e', '--extractor', help='Feature extractor', default='cnn1lstm', choices=['mlp', 'cnn1', 'lstm', 'bilstm', 'cnn1lstm', 'som'])
-    parser.add_argument('-c', '--classes', help='Delay class when prediction starts', type=int, nargs='+', default=[1, 2, 3, 4, 5])
+    parser.add_argument('-e', '--extractor', help='Feature extractor', default='cnn1', choices=['mlp', 'cnn1', 'lstm', 'bilstm', 'cnn1lstm', 'aen', 'som'])
+    parser.add_argument('-c', '--classes', help='Delay class when prediction starts', type=int, nargs='+', default=[5])
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=seed)
     parser.add_argument('-g', '--gpu', help='GPU to use', default='0')
     parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
     parser.add_argument('-y', '--ylimits', help='Use bleach ratio limits from data?', default=False, type=bool)
-    parser.add_argument('-r', '--retrain', help='Retrain model?', default=True, type=bool)
+    parser.add_argument('-r', '--retrain', help='Retrain model?', default=False, type=bool)
     parser.add_argument('-n', '--ntests', help='Number of tests', type=int, default=1)
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=modes)
+    parser.add_argument('-p', '--permutations', help='Number of permutations', default=100, type=int)
+    parser.add_argument('-u', '--update', help='Update results?', default=False, type=bool)
     args = parser.parse_args()
 
     # model input layer
@@ -34,6 +36,10 @@ if __name__ == '__main__':
         ae = True
     else:
         ae = False
+
+    # permutation test
+
+    perm = False
 
     # number of tests
 
@@ -124,6 +130,8 @@ if __name__ == '__main__':
         mean_errors = np.zeros(ntests)
         min_errors = np.zeros(ntests)
         max_errors = np.zeros(ntests)
+        aucs = np.zeros(ntests)
+        feature_importances = np.zeros((len(features), ntests))
 
         for k in range(ntests):
             print(f'Test {k + 1}/{ntests}:')
@@ -136,12 +144,14 @@ if __name__ == '__main__':
             val, remaining = np.split(inds, [int(validation_share * len(inds))])
             tr, te = np.split(remaining, [int(train_test_ratio * len(remaining))])
             if ae:
-                labels[np.where((labels < br_min) | (labels > br_max))[0]] = 1
-                labels[np.where((labels >= br_min) & (labels <= br_max))[0]] = 0
+                labels_ = np.zeros_like(labels)
+                labels_[np.where((labels < br_min) | (labels > br_max))[0]] = 1
                 outlier_ids = tr[np.where(labels[tr] == 1)[0]]
                 val = np.append(val, outlier_ids)
                 te = np.append(te, outlier_ids)
-                tr = tr[np.where(labels[tr] == 0)[0]]
+                tr = tr[np.where(labels_[tr] == 0)[0]]
+            else:
+                labels_ = labels.copy()
             if args.mode == 'production':
                 tr = np.hstack([tr, val])
                 val = te.copy()
@@ -151,7 +161,7 @@ if __name__ == '__main__':
             inds_splitted[2] = te
             timestamps_k, values_k, labels_k = {}, {}, {}
             for fi, stage in enumerate(stages):
-                timestamps_k[stage], values_k[stage], labels_k[stage] = timestamps[inds_splitted[fi]], values[inds_splitted[fi], :], labels[inds_splitted[fi]]
+                timestamps_k[stage], values_k[stage], labels_k[stage] = timestamps[inds_splitted[fi]], values[inds_splitted[fi], :], labels_[inds_splitted[fi]]
 
             # standardization coefficients
 
@@ -249,10 +259,18 @@ if __name__ == '__main__':
             predictions = model.predict(Xi)
 
             if ae:
-                print(f'Anomaly detection ROC AUC (FPR=100 %): {roc_auc(Yi, predictions, fpr=1)}')
-                print(f'Anomaly detection ROC AUC (FPR=10 %): {roc_auc(Yi, predictions, fpr=0.1)}')
-                print(f'Anomaly detection ROC AUC (FPR=1 %): {roc_auc(Yi, predictions, fpr=0.01)}')
+
+                aucs[k] = roc_auc(Yi, predictions)
+                reals.extend(Yi)
+                tsteps.extend(Ti)
+                preds.extend(predictions)
+
+                print(f'Anomaly detection ROC AUC (FPR = 10%): {roc_auc(Yi, predictions, fpr=0.1)}')
+                print(f'Anomaly detection ROC AUC (FPR = 1%): {roc_auc(Yi, predictions, fpr=0.01)}')
+                print(f'Anomaly detection ROC AUC (FPR = 0.1%): {roc_auc(Yi, predictions, fpr=0.001)}')
+
             else:
+
                 predictions = predictions[br_key].flatten()
                 min_errors[k] = np.min(np.abs(Yi - predictions))
                 mean_errors[k] = np.mean(np.abs(Yi - predictions))
@@ -271,68 +289,165 @@ if __name__ == '__main__':
 
             # calculate prediction error for features permuted
 
-            # TO DO
+            if delay_class == 5 and args.permutations > 0:
+
+                # permutation flag
+
+                perm = True
+
+                # init permutations
+
+                n = len(Yi)
+                perm_idx = []
+                idx = np.arange(n)
+                for i in range(args.permutations):
+                    np.random.shuffle(idx)
+                    perm_idx.append(idx.copy())
+
+                # loop through tags
+
+                for feature_i, feature in enumerate(features_selected):
+
+                    feature_idx = features_selected.index(feature)
+                    lp = len(perm_idx)
+                    error = np.zeros(lp)
+
+                    for i in range(lp):
+
+                        # permute
+
+                        Xp = Xi.copy()
+                        Xp[feature] = Xi[feature][perm_idx[i]]
+
+                        # predict and calculate inference statistics
+
+                        predictions = model.predict(Xp)
+                        if ae:
+                            error[i] = roc_auc(Yi, predictions) - aucs[k]
+                        else:
+                            predictions = predictions[br_key].flatten()
+                            error[i] = np.mean(np.abs(Yi - predictions))
+
+                    feature_importances[feature_i, k] = np.mean(error) - mean_errors[k]
+                    if args.verbose:
+                        print(f'Importance of feature {feature_idx} ({feature}): {feature_importances[feature_i, k]}')
 
         # results tables
 
-        mean_e_path = osp.join(results_mode_dir, prediction_mean_errors_fname)
-        min_e_path = osp.join(results_mode_dir, prediction_min_errors_fname)
-        max_e_path = osp.join(results_mode_dir, prediction_max_errors_fname)
-        r_path = osp.join(results_mode_dir, prediction_results_fname)
-
-        try:
-            p_e_mean = pd.read_csv(mean_e_path)
-        except Exception:
-            p_e_mean = pd.DataFrame({
-                dc_combs_col_name: [comb for comb in tbl_dc_combs]
-            })
-
-        if model_type not in p_e_mean.keys():
-            p_e_mean[model_type] = [np.nan for comb in tbl_dc_combs]
-
-        try:
-            p_e_min = pd.read_csv(min_e_path)
-        except:
-            p_e_min = pd.DataFrame({
-                dc_combs_col_name: [comb for comb in tbl_dc_combs]
-            })
-
-        if model_type not in p_e_min.keys():
-            p_e_min[model_type] = [np.nan for comb in tbl_dc_combs]
-
-        try:
-            p_e_max = pd.read_csv(max_e_path)
-        except:
-            p_e_max = pd.DataFrame({
-                dc_combs_col_name: [comb for comb in tbl_dc_combs]
-            })
-
-        if model_type not in p_e_max.keys():
-            p_e_max[model_type] = [np.nan for comb in tbl_dc_combs]
-
-        try:
-            pr = pd.read_csv(r_path)
-            assert pr.shape[0] == len(tsteps), 'The dataset size has changed, the statistics table will be rewritten!'
-        except:
-            pr = pd.DataFrame({
-                ts_key: [value for value in tsteps],
-                br_key: [value for value in reals],
-            })
-
-        # save results
-
         if ae:
-            pass
+
+            mean_a_path = osp.join(results_mode_dir, anomaly_detection_mean_aucs_fname)
+            r_path = osp.join(results_mode_dir, anomaly_detection_results_fname)
+
+            try:
+                auc_mean = pd.read_csv(mean_a_path)
+            except:
+                auc_mean = pd.DataFrame({
+                    dc_combs_col_name: [comb for comb in tbl_dc_combs]
+                })
+
+            if model_type not in auc_mean.keys():
+                auc_mean[model_type] = [np.nan for comb in tbl_dc_combs]
+
+            try:
+                pr = pd.read_csv(r_path)
+                assert pr.shape[0] == len(tsteps), 'The dataset size has changed, the statistics table will be rewritten!'
+            except:
+                pr = pd.DataFrame({
+                    ts_key: [value for value in tsteps],
+                    br_key: [value for value in reals],
+                })
 
         else:
-            assert model_dc_comb in tbl_dc_combs
-            idx = tbl_dc_combs.index(model_dc_comb)
-            p_e_mean[model_type].values[idx] = np.mean(mean_errors)
-            p_e_mean.to_csv(mean_e_path, index=None)
-            p_e_min[model_type].values[idx] = np.mean(min_errors)
-            p_e_min.to_csv(min_e_path, index=None)
-            p_e_max[model_type].values[idx] = np.mean(max_errors)
-            p_e_max.to_csv(max_e_path, index=None)
+
+            mean_e_path = osp.join(results_mode_dir, prediction_mean_errors_fname)
+            min_e_path = osp.join(results_mode_dir, prediction_min_errors_fname)
+            max_e_path = osp.join(results_mode_dir, prediction_max_errors_fname)
+            r_path = osp.join(results_mode_dir, prediction_results_fname)
+
+            try:
+                p_e_mean = pd.read_csv(mean_e_path)
+            except Exception:
+                p_e_mean = pd.DataFrame({
+                    dc_combs_col_name: [comb for comb in tbl_dc_combs]
+                })
+
+            if model_type not in p_e_mean.keys():
+                p_e_mean[model_type] = [np.nan for comb in tbl_dc_combs]
+
+            try:
+                p_e_min = pd.read_csv(min_e_path)
+            except:
+                p_e_min = pd.DataFrame({
+                    dc_combs_col_name: [comb for comb in tbl_dc_combs]
+                })
+
+            if model_type not in p_e_min.keys():
+                p_e_min[model_type] = [np.nan for comb in tbl_dc_combs]
+
+            try:
+                p_e_max = pd.read_csv(max_e_path)
+            except:
+                p_e_max = pd.DataFrame({
+                    dc_combs_col_name: [comb for comb in tbl_dc_combs]
+                })
+
+            if model_type not in p_e_max.keys():
+                p_e_max[model_type] = [np.nan for comb in tbl_dc_combs]
+
+            try:
+                pr = pd.read_csv(r_path)
+                assert pr.shape[0] == len(tsteps), 'The dataset size has changed, the statistics table will be rewritten!'
+
+            except:
+                pr = pd.DataFrame({
+                    ts_key: [value for value in tsteps],
+                    br_key: [value for value in reals],
+                })
+
+        pfi_name = permutation_importance_csv
+        pfi_path = osp.join(task_results_dir, pfi_name)
+
+        try:
+            pfi = pd.read_csv(pfi_path)
+        except:
+            pfi = pd.DataFrame({
+                'Features': [tag for tag in features]
+            })
+
+        if model_type not in pfi.keys():
+            pfi[model_type] = [np.nan for feature in features]
+
+        # update prediction results
+
+        if args.update:
+
+            if ae:
+
+                assert model_dc_comb in tbl_dc_combs
+                idx = tbl_dc_combs.index(model_dc_comb)
+                auc_mean[model_type].values[idx] = np.mean(aucs)
+                auc_mean.to_csv(mean_a_path, index=None)
+
+            else:
+                assert model_dc_comb in tbl_dc_combs
+                idx = tbl_dc_combs.index(model_dc_comb)
+                p_e_mean[model_type].values[idx] = np.mean(mean_errors)
+                p_e_mean.to_csv(mean_e_path, index=None)
+                p_e_min[model_type].values[idx] = np.mean(min_errors)
+                p_e_min.to_csv(min_e_path, index=None)
+                p_e_max[model_type].values[idx] = np.mean(max_errors)
+                p_e_max.to_csv(max_e_path, index=None)
 
             pr[model_name] = preds
             pr.to_csv(r_path, index=None)
+
+        # save permutation results
+
+        if perm:
+            pfi[model_type].values[:] = np.mean(feature_importances, axis=1)
+            pfi.to_csv(pfi_path, index=None)
+
+
+
+

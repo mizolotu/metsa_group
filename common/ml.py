@@ -86,6 +86,13 @@ def som(features, xmin, xmax, nfeatures, target, layers=[64, 64], lr=5e-5):
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
     return model
 
+def aen(features, xmin, xmax, nfeatures, target, lr=5e-5):
+    model = AEN(features, xmin, xmax, nfeatures, target)
+    model.build(input_shape={f: (None, 1) for f in features})
+    model.compute_output_shape({f: (None, 1) for f in features})
+    model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
+    return model
+
 def model_output(inputs, hidden, target, ymin, ymax, nhidden=2048, dropout=0.5, lr=1e-6, eps=1e-8):
     if dropout is not None:
         hidden = tf.keras.layers.Dropout(dropout)(hidden)
@@ -137,7 +144,7 @@ def som_loss(weights, distances):
 
 class SOM(tf.keras.models.Model):
 
-    def __init__(self, map_size, features, xmin, xmax, nfeatures, target, split_neurons=256, cnn_filters=256, latent_dim=512, T_min=0.1, T_max=10.0, niterations=10000, nnn=4, batchnorm=False, eps=1e-10):
+    def __init__(self, map_size, features, xmin, xmax, nfeatures, target, split_neurons=256, en_filters=[512, 1024], nfilters=512, latent_dim=512, T_min=0.1, T_max=10.0, niterations=10000, nnn=4, batchnorm=False, eps=1e-10):
         super(SOM, self).__init__()
 
         self.map_size = map_size
@@ -147,7 +154,8 @@ class SOM(tf.keras.models.Model):
         self.xmax = xmax
         self.nfeatures = nfeatures
         self.batchnorm = batchnorm
-        self.cnn_filters = cnn_filters
+        self.en_filters = en_filters
+        self.nfilters = nfilters
         self.eps = eps
 
         self.nprototypes = np.prod(map_size)
@@ -156,10 +164,10 @@ class SOM(tf.keras.models.Model):
         self.prototype_coordinates = tf.convert_to_tensor(np.array([item.flatten() for item in mg]).T)
         self.split_layer = [tf.keras.layers.Dense(split_neurons, activation='relu') for _ in self.nfeatures]
         self.unsplit_layer = [tf.keras.layers.Dense(nf, activation='relu') for nf in self.nfeatures]
-        self.cnn_encoder = [tf.keras.layers.Conv1D(nf, 2, activation='relu', padding='same') for nf in self.cnn_filters[:-1]]
-        self.cnn_encoder.append(tf.keras.layers.Conv1D(self.cnn_filters[-1], len(self.nfeatures), activation='relu'))
+        self.cnn_encoder = [tf.keras.layers.Conv1D(nf, 2, activation='relu', padding='same') for nf in self.en_filters]
+        self.cnn_encoder.append(tf.keras.layers.Conv1D(self.nfilters, len(self.nfeatures), activation='relu'))
         self.latent = tf.keras.layers.Dense(latent_dim, activation='relu')
-        self.cnn_decoder = [tf.keras.layers.Conv1DTranspose(nf, 2, activation='relu') for nf in self.nfeatures[:-1]]
+        self.cnn_decoder = [tf.keras.layers.Conv1DTranspose(self.nfilters, 2, activation='relu') for _ in self.nfeatures[:-1]]
         self.som_layer = SOMLayer(map_size, name='som_layer')
         self.threshold = self.add_weight(shape=(), name=threshold_variable_name, initializer=tf.keras.initializers.Ones())
 
@@ -246,7 +254,6 @@ class SOM(tf.keras.models.Model):
 
         x, y = data
         x = tf.keras.layers.Concatenate(axis=-1)([tf.expand_dims(x[f], -1) for f in self.features])
-        y = y[self.target]
 
         with tf.GradientTape() as tape:
 
@@ -327,7 +334,6 @@ class SOM(tf.keras.models.Model):
 
         x, y = data
         x = tf.keras.layers.Concatenate(axis=-1)([tf.expand_dims(x[f], -1) for f in self.features])
-        y = y[self.target]
 
         # deal with nans
 
@@ -385,6 +391,193 @@ class SOM(tf.keras.models.Model):
             "re": self.re_tracker.result(),
             'cl': self.cl_tracker.result()
         }
+
+
+class AEN(tf.keras.models.Model):
+
+    def __init__(self, features, xmin, xmax, nfeatures, target, split_neurons=256, en_filters=[512, 1024], nfilters=512, latent_dim=512, batchnorm=False, eps=1e-10):
+        super(AEN, self).__init__()
+
+        self.features = features
+        self.target = target
+        self.xmin = xmin
+        self.xmax = xmax
+        self.nfeatures = nfeatures
+        self.batchnorm = batchnorm
+        self.en_filters = en_filters
+        self.nfilters = nfilters
+        self.eps = eps
+
+        self.split_layer = [tf.keras.layers.Dense(split_neurons, activation='relu') for _ in self.nfeatures]
+        self.unsplit_layer = [tf.keras.layers.Dense(nf, activation='relu') for nf in self.nfeatures]
+        self.cnn_encoder = [tf.keras.layers.Conv1D(nf, 2, activation='relu', padding='same') for nf in self.en_filters]
+        self.cnn_encoder.append(tf.keras.layers.Conv1D(self.nfilters, len(self.nfeatures), activation='relu'))
+        self.latent = tf.keras.layers.Dense(latent_dim, activation='relu')
+        self.cnn_decoder = [tf.keras.layers.Conv1DTranspose(self.nfilters, 2, activation='relu') for _ in self.nfeatures[:-1]]
+        self.threshold = self.add_weight(shape=(), name=threshold_variable_name, initializer=tf.keras.initializers.Ones())
+
+        self.loss_tracker = tf.keras.metrics.Mean(name='loss')
+
+    def call(self, x):
+
+        # input
+
+        x = tf.keras.layers.Concatenate(axis=-1)([x[f] for f in self.features])
+
+        # deal with nans
+
+        is_nan = tf.math.is_nan(x)
+        masks = tf.dtypes.cast(-self.xmax, tf.float32)
+        inputs_nan = tf.dtypes.cast(is_nan, dtype=tf.float32)
+        inputs_not_nan = tf.dtypes.cast(tf.math.logical_not(is_nan), dtype=tf.float32)
+        inputs_without_nan = tf.math.multiply_no_nan(x, inputs_not_nan) + tf.math.multiply_no_nan(masks, inputs_nan)
+
+        # standardize the input
+
+        x = (inputs_without_nan - self.xmin) / (self.xmax - self.xmin + self.eps)
+
+        # split
+
+        x_tmp = tf.split(x, self.nfeatures, axis=-1)
+        x_spl = []
+        for i, spl in enumerate(x_tmp):
+            x_spl.append(self.split_layer[i](spl))
+        x_spl = tf.stack(x_spl, axis=-2)
+
+        # encoding
+
+        for layer in self.cnn_encoder:
+            x_spl = layer(x_spl)
+
+        # decoding
+
+        x_rec = x_spl
+        for layer in self.cnn_decoder:
+            x_rec = layer(x_rec)
+        x_tmp = tf.split(x_rec, len(self.nfeatures), axis=1)
+        x_rec = []
+        for i, spl in enumerate(x_tmp):
+            x_rec.append(tf.keras.layers.Flatten()(self.unsplit_layer[i](spl)))
+        x_rec = tf.concat(x_rec, axis=-1)
+
+        # error
+
+        rec_errors = tf.math.sqrt(tf.reduce_sum(tf.square(x - x_rec), axis=-1))
+
+        return rec_errors
+
+    def train_step(self, data):
+
+        # input
+
+        x, y = data
+        x = tf.keras.layers.Concatenate(axis=-1)([tf.expand_dims(x[f], -1) for f in self.features])
+
+        with tf.GradientTape() as tape:
+
+            # deal with nans
+
+            is_nan = tf.math.is_nan(x)
+            masks = tf.dtypes.cast(-self.xmax, tf.float32)
+            inputs_nan = tf.dtypes.cast(is_nan, dtype=tf.float32)
+            inputs_not_nan = tf.dtypes.cast(tf.math.logical_not(is_nan), dtype=tf.float32)
+            inputs_without_nan = tf.math.multiply_no_nan(x, inputs_not_nan) + tf.math.multiply_no_nan(masks, inputs_nan)
+
+            # standardize the input
+
+            x = (inputs_without_nan - self.xmin) / (self.xmax - self.xmin + self.eps)
+
+            # split
+
+            x_tmp = tf.split(x, self.nfeatures, axis=-1)
+            x_spl = []
+            for i, spl in enumerate(x_tmp):
+                x_spl.append(self.split_layer[i](spl))
+            x_spl = tf.stack(x_spl, axis=-2)
+
+            # encoding
+
+            for layer in self.cnn_encoder:
+                x_spl = layer(x_spl)
+
+            # decoding
+
+            x_rec = x_spl
+            for layer in self.cnn_decoder:
+                x_rec = layer(x_rec)
+            x_tmp = tf.split(x_rec, len(self.nfeatures), axis=1)
+            x_rec = []
+            for i, spl in enumerate(x_tmp):
+                x_rec.append(tf.keras.layers.Flatten()(self.unsplit_layer[i](spl)))
+            x_rec = tf.concat(x_rec, axis=-1)
+
+            # calculate loss
+
+            rec_errors = tf.math.sqrt(tf.reduce_sum(tf.square(x - x_rec), axis=-1))
+            losses = rec_errors
+            loss = tf.reduce_mean(losses)
+
+        grads = tape.gradient(loss, self.trainable_weights)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+        self.loss_tracker.update_state(loss)
+
+        return {
+            "loss": self.loss_tracker.result(),
+        }
+
+    def test_step(self, data):
+
+        # input
+
+        x, y = data
+        x = tf.keras.layers.Concatenate(axis=-1)([tf.expand_dims(x[f], -1) for f in self.features])
+
+        # deal with nans
+
+        is_nan = tf.math.is_nan(x)
+        masks = tf.dtypes.cast(-self.xmax, tf.float32)
+        inputs_nan = tf.dtypes.cast(is_nan, dtype=tf.float32)
+        inputs_not_nan = tf.dtypes.cast(tf.math.logical_not(is_nan), dtype=tf.float32)
+        inputs_without_nan = tf.math.multiply_no_nan(x, inputs_not_nan) + tf.math.multiply_no_nan(masks, inputs_nan)
+
+        # standardize the input
+
+        x = (inputs_without_nan - self.xmin) / (self.xmax - self.xmin + self.eps)
+
+        # split
+
+        x_tmp = tf.split(x, self.nfeatures, axis=-1)
+        x_spl = []
+        for i, spl in enumerate(x_tmp):
+            x_spl.append(self.split_layer[i](spl))
+        x_spl = tf.stack(x_spl, axis=-2)
+
+        # encoding
+
+        for layer in self.cnn_encoder:
+            x_spl = layer(x_spl)
+
+        # decoding
+
+        x_rec = x_spl
+        for layer in self.cnn_decoder:
+            x_rec = layer(x_rec)
+        x_tmp = tf.split(x_rec, len(self.nfeatures), axis=1)
+        x_rec = []
+        for i, spl in enumerate(x_tmp):
+            x_rec.append(tf.keras.layers.Flatten()(self.unsplit_layer[i](spl)))
+        x_rec = tf.concat(x_rec, axis=-1)
+
+        rec_errors = tf.math.sqrt(tf.reduce_sum(tf.square(x - x_rec), axis=-1))
+        losses = rec_errors
+        loss = tf.reduce_mean(losses)
+
+        self.loss_tracker.update_state(loss)
+
+        return {
+            "loss": self.loss_tracker.result()
+        }
+
 
 class EarlyStoppingAtMaxAUC(tf.keras.callbacks.Callback):
 

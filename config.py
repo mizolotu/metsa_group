@@ -16,12 +16,15 @@ xx_spearman_correlation_csv = 'feature_vs_feature_spearman_correlation.csv'
 xy_correlation_csv = 'feature_vs_target_correlation.csv'
 
 #prediction_error_csv = 'prediction_error.csv'
-#permutation_error_csv = 'permutation_error.csv'
+permutation_importance_csv = 'permutation_importance.csv'
 
 prediction_results_fname = 'prediction_results.csv'
 prediction_mean_errors_fname = 'prediction_mean_errors.csv'
 prediction_min_errors_fname = 'prediction_min_errors.csv'
 prediction_max_errors_fname = 'prediction_max_errors.csv'
+
+anomaly_detection_results_fname = 'anomaly_detection_results.csv'
+anomaly_detection_mean_aucs_fname = 'anomaly_detection_mean_aucs.csv'
 
 summary_txt = 'summary.txt'
 example_samples_fname = 'example.json'
@@ -53,7 +56,7 @@ epochs = 10000
 patience = 100
 series_len = 64
 threshold_variable_name = 'threshold'
-ae_models = ['som']
+ae_models = ['aen', 'som']
 
 # azure
 
