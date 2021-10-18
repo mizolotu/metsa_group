@@ -7,21 +7,6 @@ import argparse as arp
 
 from config import *
 
-def load_batches(path, tags, batch_size):
-    batches = tf.data.experimental.make_csv_dataset(
-        path,
-        batch_size=batch_size,
-        shuffle=True,
-        select_columns=tags,
-        label_name=tags[-1],
-        num_epochs=1
-    )
-    return batches
-
-def regression_mapper(features, label):
-    features = tf.stack(list(features.values()), axis=-1)
-    return features, label
-
 def mlp(nfeatures, nhiddens, xmin, xmax, ymin, ymax, dropout=0.5, batchnorm=True, lr=2.5e-4):
     if type(nfeatures) is list:
         nfeatures = np.sum(nfeatures)

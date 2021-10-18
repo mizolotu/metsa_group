@@ -5,7 +5,7 @@ import numpy as np
 import argparse as arp
 
 from config import *
-from calculate_feature_importance_based_on_prediction_error import load_meta
+from bruteforce_feature_test import load_meta
 from matplotlib import pyplot as pp
 from matplotlib.patches import Patch
 
