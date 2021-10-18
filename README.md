@@ -61,7 +61,7 @@ python3 calculate_permutation_importance.py -m <prediction model, e.g. cnn> -l <
 3. Calculate feature importance based on prediction error:
 
 ```bash
-python3 calculate_feature_importance_based_on_prediction_error.py -e <evaluation method: selected, not-selected or permuted> -m <prediction model, e.g. cnn> -l <model layer sizes, e.g. 2048 2048>
+python3 bruteforce_feature_test.py -e <evaluation method: selected, not-selected or permuted> -m <prediction model, e.g. cnn> -l <model layer sizes, e.g. 2048 2048>
 ```
 
 4. Plot feature importance:
