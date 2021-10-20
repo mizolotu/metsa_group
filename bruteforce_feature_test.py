@@ -9,51 +9,6 @@ from config import *
 from common.ml import model_input, model_output, mlp, split, cnn1
 from common.utils import set_seeds, load_meta, load_data
 
-def mlp1(nfeatures, nhiddens, xmin, xmax, ymin, ymax, dropout=0.5, batchnorm=True, lr=2.5e-4):
-    if type(nfeatures) is list:
-        nfeatures = np.sum(nfeatures)
-    inputs = tf.keras.layers.Input(shape=(nfeatures,))
-    inputs_std = (inputs - xmin) / (xmax - xmin + eps)
-    if batchnorm:
-        hidden = tf.keras.layers.BatchNormalization()(inputs_std)
-    else:
-        hidden = inputs_std
-    for nh in nhiddens:
-        hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
-        if dropout is not None:
-            hidden = tf.keras.layers.Dropout(dropout)(hidden)
-    outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
-    outputs = outputs * (ymax - ymin) + ymin
-    model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-    model.compile(loss=tf.keras.losses.MeanAbsoluteError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
-    return model
-
-def cnn(nfeatures, nhiddens, xmin, xmax, ymin, ymax, latent_dim=64, nfilters=512, kernel_size=3, batchnorm=True, dropout=0.5, lr=2.5e-4):
-    nfeatures_sum = np.sum(nfeatures)
-    inputs = tf.keras.layers.Input(shape=(nfeatures_sum,))
-    inputs_std = (inputs - xmin) / (xmax - xmin + eps)
-    if batchnorm:
-        hidden = tf.keras.layers.BatchNormalization()(inputs_std)
-    else:
-        hidden = inputs_std
-    hidden_spl = tf.split(hidden, nfeatures, axis=1)
-    hidden = []
-    for spl in hidden_spl:
-        hidden.append(tf.keras.layers.Dense(latent_dim, activation='relu')(spl))
-    hidden = tf.stack(hidden, axis=1)
-    hidden = tf.keras.layers.Conv1D(nfilters, kernel_size, activation='relu')(hidden)
-    hidden = tf.keras.layers.Conv1D(nfilters, kernel_size, activation='relu')(hidden)
-    hidden = tf.keras.layers.Flatten()(hidden)
-    for nh in nhiddens:
-        hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
-        if dropout is not None:
-            hidden = tf.keras.layers.Dropout(dropout)(hidden)
-    outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
-    outputs = outputs * (ymax - ymin) + ymin
-    model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-    model.compile(loss=tf.keras.losses.MeanAbsoluteError(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.MeanSquaredError(name='mse'), tf.keras.metrics.MeanAbsoluteError(name='mae')])
-    return model
-
 if __name__ == '__main__':
 
     # args
@@ -64,7 +19,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-g', '--gpu', help='GPU to use', default='0')
     parser.add_argument('-v', '--verbose', help='Verbose', default=False, type=bool)
-    parser.add_argument('-e', '--evalmethod', help='Evaluation method', choices=['selected', 'not-selected', 'permuted'], default='selected')
+    parser.add_argument('-e', '--evalmethod', help='Evaluation method', choices=['selected', 'not-selected', 'permuted'], default='permuted')
     args = parser.parse_args()
 
     # gpu
@@ -89,8 +44,6 @@ if __name__ == '__main__':
     # load data
 
     values, labels, timestamps = load_data(osp.join(task_dir, features_fname), features)
-
-    # create output directories
 
     # create output directories
 
@@ -152,8 +105,6 @@ if __name__ == '__main__':
 
         # features
 
-        tag_idx = features.index(tag)
-
         if args.evalmethod == 'selected':
             Xtv, Ytv = {}, {}
             for stage in stages[:-1]:
@@ -164,8 +115,8 @@ if __name__ == '__main__':
             Xi = {}
             Xi[tag] = values_k[stage][:, tagi]
             Yi = labels_k[stage]
-            xmin_selected = xmin[tag_idx : tag_idx + 1]
-            xmax_selected = xmax[tag_idx : tag_idx + 1]
+            xmin_selected = xmin[tagi : tagi + 1]
+            xmax_selected = xmax[tagi : tagi + 1]
             print(f'{tagi + 1}/{len(features)} Training using tag {tag}')
             nfeatures = 1
             tags_selected = [tag]
@@ -184,15 +135,15 @@ if __name__ == '__main__':
                     Xi[f] = values_k[stage][:, fi]
             Yi = labels_k[stage]
             nfeatures = []
-            for c in uc:
-                if classes[tagi] == c:
-                    nfeatures.append(len(np.where(classes == c)[0]) - 1)
+            for uc in uclasses:
+                if classes[tagi] == uc:
+                    nfeatures.append(len(np.where(classes == uc)[0]) - 1)
                 else:
-                    nfeatures.append(len(np.where(classes == c)[0]))
+                    nfeatures.append(len(np.where(classes == uc)[0]))
             tags_selected = features.copy()
             tags_selected.remove(tag)
-            xmin_selected = np.hstack([xmin[: tag_idx], xmin[tag_idx + 1 :]])
-            xmax_selected = np.hstack([xmax[: tag_idx], xmax[tag_idx + 1 :]])
+            xmin_selected = np.hstack([xmin[: tagi], xmin[tagi + 1 :]])
+            xmax_selected = np.hstack([xmax[: tagi], xmax[tagi + 1 :]])
             print(f'{tagi + 1}/{len(features)} Training using all but tag {tag}')
         elif args.evalmethod == 'permuted':
             Xtv, Ytv = {}, {}
@@ -207,8 +158,8 @@ if __name__ == '__main__':
                 Xi[f] = values_k[stage][:, fi]
             Yi = labels_k[stage]
             nfeatures = []
-            for c in uc:
-                nfeatures.append(len(np.where(classes == c)[0]))
+            for uc in uclasses:
+                nfeatures.append(len(np.where(classes == uc)[0]))
             tags_selected = features.copy()
             xmin_selected = xmin
             xmax_selected = xmax
@@ -218,12 +169,12 @@ if __name__ == '__main__':
             shuffle_idx_val = np.arange(nval)
             np.random.shuffle(shuffle_idx_tr)
             np.random.shuffle(shuffle_idx_val)
-            Xtv[stages[0]][tag_idx] = Xtv[stages[0]][tag_idx][shuffle_idx_tr]
-            Xtv[stages[1]][tag_idx] = Xtv[stages[1]][tag_idx][shuffle_idx_val]
+            Xtv[stages[0]][tag] = Xtv[stages[0]][tag][shuffle_idx_tr]
+            Xtv[stages[1]][tag] = Xtv[stages[1]][tag][shuffle_idx_val]
 
         # create model
 
-        inputs, inputs_processed = model_input(tags_selected, xmin, xmax)
+        inputs, inputs_processed = model_input(tags_selected, xmin_selected, xmax_selected)
         if args.evalmethod == 'selected':
             hidden = inputs_processed
             model_type = 'mlp'
