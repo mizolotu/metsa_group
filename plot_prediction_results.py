@@ -6,7 +6,6 @@ import numpy as np
 import argparse as arp
 
 from config import *
-from matplotlib import pyplot as pp
 from matplotlib.patches import Patch
 from common.plot import plot_multiple_bars
 
@@ -17,7 +16,7 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Plot prediction errors')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=modes)
-    parser.add_argument('-e', '--legend', help='Feature extractors', nargs='+', default=['mlp', 'lstm', 'bilstm', 'cnn1lstm', 'cnn1'])
+    parser.add_argument('-l', '--legend', help='Feature extractors', nargs='+', default=['mlp', 'lstm', 'bilstm', 'cnn1lstm', 'cnn1'])
     args = parser.parse_args()
 
     # create output directory

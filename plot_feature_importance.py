@@ -8,8 +8,9 @@ from config import *
 from bruteforce_feature_test import load_meta
 from matplotlib import pyplot as pp
 from matplotlib.patches import Patch
+from common.plot import plot_bars
 
-def plot_bars(tags, heights, hatches, items_for_argsort, fname, figh, ylabel, reverse=False, plot_png=False):
+def plot_bars1(tags, heights, hatches, items_for_argsort, fname, figh, ylabel, reverse=False, plot_png=False):
     fpath = osp.join(task_figures_dir, f'{fname}{pdf}')
     idx = np.argsort(items_for_argsort)
     if reverse:
@@ -37,12 +38,23 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Plot feature importance')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
+    parser.add_argument('-a', '--anonymize', help='Anonymize?', type=bool, default=True)
     args = parser.parse_args()
 
-    # meta
+    # directories and meta
 
-    meta = load_meta(processed_data_dir, args.task)
-    tags = meta['tags']
+    task_dir = osp.join(data_dir, args.task)
+    task_results_dir = osp.join(results_dir, args.task)
+    meta = load_meta(osp.join(task_dir, meta_fname))
+    features = meta['features']
+    classes = meta['classes']
+
+    if args.anonymize:
+        postfix = '_anonymized'
+        feature_names = [str(i + 1) for i in range(len(features))]
+    else:
+        postfix = ''
+        feature_names = features
 
     # create output directory
 
@@ -51,22 +63,14 @@ if __name__ == '__main__':
         if not osp.isdir(dir):
             os.mkdir(dir)
 
-    # delay classes and tags
-
-    dc_list, tag_list = [], []
-    for key in sorted(tags.keys()):
-        dc_list.extend([key for _ in tags[key]])
-        tag_list.extend(tags[key])
-    tags = np.array(tag_list)
-    dcs = np.array(dc_list, dtype=int)
-
     # plot settings
 
+    xlabel = 'Features'
     unique_colors = np.array(['darkviolet', 'royalblue', 'seagreen', 'gold', 'firebrick'])
     unique_hatches = np.array(['-', '\\', '/', '.', 'o'])
     legend_items = [Patch(facecolor='white', edgecolor='black', hatch=hatch) for hatch in unique_hatches]
-    legend_names = [f'Delay class {dc}' for dc in np.unique(dcs)]
-    _idx = dcs - 1
+    legend_names = [f'Delay class {dc}' for dc in np.unique(classes)]
+    _idx = np.array(classes) - 1
     colors = unique_colors[_idx]
     hatches = unique_hatches[_idx]
 
@@ -78,26 +82,26 @@ if __name__ == '__main__':
     names = []
     fighs = []
     ylabels = []
-    for fname in [correlation_csv, prediction_error_csv, permutation_error_csv]:
+    for fname in [xy_correlation_csv, prediction_importance_csv, permutation_importance_csv]:
         fpath = osp.join(results_dir, args.task, fname)
         p = pd.read_csv(fpath)
-        assert np.all(tags == p['Tags'].values), 'Wrong tag order, something is worng :('
+        assert np.all(features == p['Features'].values), 'Wrong tag order, something is worng :('
         for col in range(len(p.keys()) - 1):
             errors = p.values[:, 1 + col]
             data.append(errors)
-            if fname == correlation_csv:
+            if fname == xy_correlation_csv:
                 data_to_sort.append(np.abs(errors))
                 fighs.append(12)
                 ylabels.append('Correlation')
             else:
                 data_to_sort.append(errors)
-                if fname == permutation_error_csv:
+                if fname == permutation_importance_csv:
                     ylabels.append('Permutation feature importance')
                     fighs.append(7)
-                elif fname == prediction_error_csv:
+                elif fname == prediction_importance_csv:
                     ylabels.append('Prediction error')
                     fighs.append(7)
-            if fname == prediction_error_csv and col == 0:
+            if fname == prediction_importance_csv and col == 0:
                 reverses.append(False)
             else:
                 reverses.append(True)
@@ -109,7 +113,8 @@ if __name__ == '__main__':
 
     S = []
     for items, items_as, name, figh, ylabel, reverse in zip(data, data_to_sort, names, fighs, ylabels, reverses):
-        plot_bars(tags, items, hatches, items_as, name, figh, ylabel, reverse)
+        fpath = osp.join(task_figures_dir, f'{name}{postfix}{pdf}')
+        plot_bars(feature_names, items, hatches, items_as, figh, xlabel, ylabel, legend_items, legend_names, fpath, sort=True, reverse=reverse, xticks_rotation='vertical')
         if np.all(pd.isna(items) == False):
             if reverse:
                 s = items_as
@@ -122,7 +127,8 @@ if __name__ == '__main__':
 
     S = S / np.sum(S, 1)[:, None]
     S = np.sum(S, 0)
-    plot_bars(tags, S, hatches, S, 'features_ranked', 7, 'Feature importance score', reverse=True, plot_png=True)
+    fpath = osp.join(task_figures_dir, f'features_ranked{postfix}{pdf}')
+    plot_bars(feature_names, S, hatches, S, 7, xlabel, 'Feature importance score', legend_items, legend_names, fpath, sort=True, reverse=True, xticks_rotation='vertical')
 
 
 

@@ -41,11 +41,17 @@ if __name__ == '__main__':
         values = pd.read_csv(xx_path, index_col=0).values
         if args.anonymize:
             postfix = '_anonymized'
-            names = [str(i) for i in range(len(features))]
+            names = [str(i + 1) for i in range(len(features))]
         else:
             postfix = ''
             names = features
         data[xx_name] = pd.DataFrame(np.abs(values), index=features, columns=features)
+        print(xx_name)
+        for i, _ in enumerate(values):
+            c = values[i, :]
+            ac = np.abs(c)
+            ac[i] = 0
+            print(i + 1, np.max(ac), 1 + np.argmax(ac), c[np.argmax(ac)])
 
 
     # data frames and colormap
