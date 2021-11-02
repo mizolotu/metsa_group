@@ -7,11 +7,11 @@ def init():
     global models, model_selector
     model_dir = os.getenv('AZUREML_MODEL_DIR')
     model_names = {
-        1: 'production/split_cnn1_1',
-        2: 'production/split_cnn1_2',
-        3: 'production/split_cnn1_3',
-        4: 'production/split_cnn1_4',
-        5: 'production/split_cnn1_5'
+        1: 'production/cnn1_1',
+        2: 'production/cnn1_2',
+        3: 'production/cnn1_3',
+        4: 'production/cnn1_4',
+        5: 'production/cnn1_5'
     }
     models = {}
     for key in model_names.keys():

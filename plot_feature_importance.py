@@ -38,7 +38,7 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Plot feature importance')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-a', '--anonymize', help='Anonymize?', type=bool, default=True)
+    parser.add_argument('-a', '--anonymize', help='Anonymize?', type=bool, default=False)
     args = parser.parse_args()
 
     # directories and meta
@@ -125,7 +125,8 @@ if __name__ == '__main__':
 
     # rank features
 
-    S = S / np.sum(S, 1)[:, None]
+    #S = S / np.sum(S, 1)[:, None]
+    S = (S - np.min(S, 1)[:, None]) / (np.max(S, 1)[:, None] - np.min(S, 1)[:, None] + 1e-10)
     S = np.sum(S, 0)
     fpath = osp.join(task_figures_dir, f'features_ranked{postfix}{pdf}')
     plot_bars(feature_names, S, hatches, S, 7, xlabel, 'Feature importance score', legend_items, legend_names, fpath, sort=True, reverse=True, xticks_rotation='vertical')

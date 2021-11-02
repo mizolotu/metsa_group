@@ -13,9 +13,9 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Plot feature values')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-f', '--feature', help='Feature to plot', default='126A0435-SI')
+    parser.add_argument('-f', '--feature', help='Feature to plot', default='126A0503-QI_A2')  # 126A0503-QI_A2 126A0546-QI1 126A0409-FIC_A30 126A0252-QI
     parser.add_argument('-s', '--size', help='Fgiure size', default=12, type=int)
-    parser.add_argument('-y', '--target', help='Target to plot feature against', default=br_key)
+    parser.add_argument('-y', '--target', help='Target to plot feature against', default='126A0103-QI_A1')
     parser.add_argument('-p', '--permute', help='Plot feature permuted?', type=bool, default=False)
     parser.add_argument('-n', '--npoints', help='Number of points to plot', type=int, default=5000)
     parser.add_argument('-a', '--anonymize', help='Anonymize?', type=bool, default=False)
@@ -45,10 +45,8 @@ if __name__ == '__main__':
     idx_x = features.index(args.feature)
     x = values[:, idx_x]
     idx_ = np.where(np.isnan(x) == False)[0]
-    print(len(idx_))
     np.random.shuffle(idx_)
     idx_ = idx_[:args.npoints]
-    print(len(idx_))
     x = x[idx_]
 
     # y feature
@@ -63,7 +61,7 @@ if __name__ == '__main__':
 
     if args.anonymize:
         postfix = '_anonymized'
-        xlabel = f'Feature {str(idx_x)}'
+        xlabel = f'Feature {str(idx_x + 1)}'
         if args.target == br_key:
             ylabel = 'Target'
         else:
@@ -71,7 +69,7 @@ if __name__ == '__main__':
     else:
         postfix = ''
         xlabel = features[idx_x]
-        ylabel = br_key
+        ylabel = features[idx_y]
 
     # file path
 

@@ -56,6 +56,8 @@ def plot_bars(items, heights, hatches, items_for_argsort, figh, xlabel, ylabel, 
     pp.ylabel(ylabel, fontdict={'size': 12})
     pp.xticks(fontsize=12, rotation=xticks_rotation)
     pp.yticks(fontsize=12)
+    ydelta = np.max(heights) - np.min(heights)
+    pp.ylim([np.min(heights) - 0.05 * ydelta, np.max(heights) + 0.05 * ydelta])
     if len(legend_items) > 0 and len(legend_names) > 0:
         pp.legend(legend_items, legend_names, prop={'size': 12})
     pp.savefig(fpath, bbox_inches='tight')

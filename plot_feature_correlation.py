@@ -45,13 +45,15 @@ if __name__ == '__main__':
         else:
             postfix = ''
             names = features
-        data[xx_name] = pd.DataFrame(np.abs(values), index=features, columns=features)
+        data[xx_name] = pd.DataFrame(np.abs(values), index=names, columns=names)
         print(xx_name)
         for i, _ in enumerate(values):
             c = values[i, :]
             ac = np.abs(c)
             ac[i] = 0
-            print(i + 1, np.max(ac), 1 + np.argmax(ac), c[np.argmax(ac)])
+            sortedidx = np.argsort(ac)[::-1]
+            for j in range(10):
+                print(i + 1, features[i], ac[sortedidx[j]], 1 + sortedidx[j], features[sortedidx[j]])
 
 
     # data frames and colormap
