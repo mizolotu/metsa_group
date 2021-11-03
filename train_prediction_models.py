@@ -28,7 +28,7 @@ if __name__ == '__main__':
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=modes)
     parser.add_argument('-p', '--permutations', help='Number of permutations', default=100, type=int)
     parser.add_argument('-u', '--update', help='Update results?', default=False, type=bool)
-    parser.add_argument('-f', '--features', help='Feature list in json format', default='less_correlated_pearson.json')
+    parser.add_argument('-f', '--features', help='Selected feature list in json format', default='less_correlated_pearson.json')
     args = parser.parse_args()
 
     # create output directories
@@ -267,6 +267,7 @@ if __name__ == '__main__':
                 )
 
                 # save model
+
                 if args.update:
                     model.save(m_path)
                     with open(osp.join(m_path, summary_txt), 'w') as f:
@@ -326,7 +327,7 @@ if __name__ == '__main__':
 
                 for feature_i, feature in enumerate(features_selected):
 
-                    feature_idx = features_selected.index(feature)
+                    feature_idx = features.index(feature)
                     lp = len(perm_idx)
                     error = np.zeros(lp)
 
@@ -346,9 +347,9 @@ if __name__ == '__main__':
                             predictions = predictions[br_key].flatten()
                             error[i] = np.mean(np.abs(Yi - predictions))
 
-                    feature_importances[feature_i, k] = np.mean(error) - mean_errors[k]
+                    feature_importances[feature_idx, k] = np.mean(error) - mean_errors[k]
                     if args.verbose:
-                        print(f'Importance of feature {feature_idx} ({feature}): {feature_importances[feature_i, k]}')
+                        print(f'Importance of feature {feature_idx} ({feature}): {feature_importances[feature_idx, k]}')
 
         # results tables
 
@@ -463,8 +464,20 @@ if __name__ == '__main__':
         # save permutation results
 
         if perm:
-            pfi[model_type].values[:] = np.mean(feature_importances, axis=1)
+            perms = np.mean(feature_importances, axis=1)
+            print(perms)
+            pfi[model_type].values[:] = perms
             pfi.to_csv(pfi_path, index=None)
+            idx = np.where(perms > 0)[0].tolist()
+            if args.features is not None:
+                prefix = args.features.split('.json')[0]
+            else:
+                prefix = ''
+            fname = f'{prefix}_more_important_{model_type}.json'
+            with open (osp.join(task_results_dir, fname), 'w') as f:
+                json.dump(idx, f)
+
+
 
 
 
