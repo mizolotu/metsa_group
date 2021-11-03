@@ -16,7 +16,7 @@ if __name__ == '__main__':
     driver = '{ODBC Driver 17 for SQL Server}'
     table = 'metsa_brp_sample_data'
     username = 'jyusqlserver'
-    password = ''
+    password = '#jyusql1'
 
     db_connection_str = f'DRIVER={driver};SERVER={server};PORT=1433;DATABASE={database};UID={username};PWD={password}'
     params = urllib.parse.quote_plus(db_connection_str)
