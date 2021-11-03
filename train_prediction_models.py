@@ -426,7 +426,12 @@ if __name__ == '__main__':
                     br_key: [value for value in reals],
                 })
 
-        pfi_name = permutation_importance_csv
+        if args.features is not None:
+            prefix = args.features.split('.json')[0]
+        else:
+            prefix = ''
+
+        pfi_name = f'{prefix}_{permutation_importance_csv}'
         pfi_path = osp.join(task_results_dir, pfi_name)
 
         try:
@@ -467,14 +472,9 @@ if __name__ == '__main__':
 
         if perm:
             perms = np.mean(feature_importances, axis=1)
-            print(perms)
             pfi[model_type].values[:] = perms
             pfi.to_csv(pfi_path, index=None)
             idx = np.where(perms > 0)[0].tolist()
-            if args.features is not None:
-                prefix = args.features.split('.json')[0]
-            else:
-                prefix = ''
             fname = f'{prefix}_more_important_{model_type}.json'
             with open (osp.join(task_results_dir, fname), 'w') as f:
                 json.dump(idx, f)

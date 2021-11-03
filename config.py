@@ -53,7 +53,7 @@ series_step_prefix = 'step'
 
 seed = 0
 batch_size = 64
-epochs = 10000
+epochs = 1# 0000
 patience = 100
 series_len = 64
 threshold_variable_name = 'threshold'
