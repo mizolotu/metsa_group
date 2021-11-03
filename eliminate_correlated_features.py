@@ -1,7 +1,6 @@
 import json
 import os
 import os.path as osp
-import pandas as pd
 import numpy as np
 import argparse as arp
 
