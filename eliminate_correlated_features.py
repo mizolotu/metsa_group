@@ -81,11 +81,10 @@ if __name__ == '__main__':
                     features_indexes.remove(f_i)
             else:
                 done = True
-                less_correlated_features[corr] = features_indexes.copy()
+                print(f'Only {len(features_indexes)} features left!')
 
-    # save the results
+                # save the results
 
-    with open(osp.join(task_results_dir, less_correlated_json), 'w') as f:
-        json.dump(less_correlated_features)
-
-
+                fname = less_correlated_json.format(corr)
+                with open(osp.join(task_results_dir, fname), 'w') as f:
+                    json.dump(features_indexes, f)

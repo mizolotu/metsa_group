@@ -1,3 +1,4 @@
+import json
 import os
 import os.path as osp
 
@@ -27,7 +28,19 @@ if __name__ == '__main__':
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=modes)
     parser.add_argument('-p', '--permutations', help='Number of permutations', default=100, type=int)
     parser.add_argument('-u', '--update', help='Update results?', default=False, type=bool)
+    parser.add_argument('-f', '--features', help='Feature list in json format', default='less_correlated_pearson.json')
     args = parser.parse_args()
+
+    # create output directories
+
+    task_models_dir = osp.join(models_dir, args.task)
+    model_mode_dir = osp.join(task_models_dir, args.mode)
+    task_results_dir = osp.join(results_dir, args.task)
+    results_mode_dir = osp.join(task_results_dir, args.mode)
+    task_figures_dir = osp.join(figures_dir, args.task)
+    for d in [models_dir, task_models_dir, model_mode_dir, results_dir, task_results_dir, results_mode_dir, task_figures_dir]:
+        if not osp.isdir(d):
+            os.mkdir(d)
 
     # model input layer
 
@@ -36,6 +49,14 @@ if __name__ == '__main__':
         ae = True
     else:
         ae = False
+
+    # feature indexes
+
+    try:
+        with open(osp.join(task_results_dir, args.features)) as f:
+            feature_indexes = json.load(f)
+    except:
+        feature_indexes = None
 
     # permutation test
 
@@ -55,7 +76,7 @@ if __name__ == '__main__':
     else:
         os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
-    # walk through first and last classes
+    # walk through classes
 
     for delay_class in args.classes:
 
@@ -69,6 +90,9 @@ if __name__ == '__main__':
         meta = load_meta(osp.join(task_dir, meta_fname))
         features = meta['features']
         classes = meta['classes']
+        if feature_indexes is not None:
+            features = [features[i] for i in feature_indexes]
+            classes = [classes[i] for i in feature_indexes]
         uclasses = np.sort(np.unique(classes))
         features_selected, feature_classes_selected = [list(item) for item in zip(*[(f, c) for f, c in zip(features, classes) if c <= delay_class])]
         u_feature_classes_selected = np.unique(feature_classes_selected)
@@ -99,17 +123,11 @@ if __name__ == '__main__':
         model_type = f'{feature_extractor}'
         model_name = f'{model_type}_{delay_class}'
 
-        # create output directories
+        # create model directory
 
-        task_models_dir = osp.join(models_dir, args.task)
-        model_mode_dir = osp.join(task_models_dir, args.mode)
         m_path = osp.join(task_models_dir, args.mode, model_name)
-        task_results_dir = osp.join(results_dir, args.task)
-        results_mode_dir = osp.join(task_results_dir, args.mode)
-        task_figures_dir = osp.join(figures_dir, args.task)
-        for d in [models_dir, task_models_dir, model_mode_dir, m_path, results_dir, task_results_dir, results_mode_dir, task_figures_dir]:
-            if not osp.isdir(d):
-                os.mkdir(d)
+        if not osp.isdir(m_path):
+            os.mkdir(m_path)
 
         # load model
 
