@@ -88,11 +88,13 @@ if __name__ == '__main__':
 
         task_dir = osp.join(data_dir, args.task)
         meta = load_meta(osp.join(task_dir, meta_fname))
-        features = meta['features']
-        classes = meta['classes']
+        all_features = meta['features']
+        all_classes = meta['classes']
         if feature_indexes is not None:
-            features = [features[i] for i in feature_indexes]
-            classes = [classes[i] for i in feature_indexes]
+            features = [all_features[i] for i in feature_indexes]
+            classes = [all_classes[i] for i in feature_indexes]
+        else:
+            features, classes = all_features.copy(), all_classes.copy()
         uclasses = np.sort(np.unique(classes))
         features_selected, feature_classes_selected = [list(item) for item in zip(*[(f, c) for f, c in zip(features, classes) if c <= delay_class])]
         u_feature_classes_selected = np.unique(feature_classes_selected)
