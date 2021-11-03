@@ -17,13 +17,13 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train prediction models')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-e', '--extractor', help='Feature extractor', default='bilstm', choices=['mlp', 'cnn1', 'lstm', 'bilstm', 'cnn1lstm', 'aen', 'som'])
+    parser.add_argument('-e', '--extractor', help='Feature extractor', default='cnn1', choices=['mlp', 'cnn1', 'lstm', 'bilstm', 'cnn1lstm', 'aen', 'som'])
     parser.add_argument('-c', '--classes', help='Delay class when prediction starts', type=int, nargs='+', default=[5])
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=seed)
     parser.add_argument('-g', '--gpu', help='GPU to use', default='0')
     parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
     parser.add_argument('-y', '--ylimits', help='Use bleach ratio limits from data?', default=False, type=bool)
-    parser.add_argument('-r', '--retrain', help='Retrain model?', default=False, type=bool)
+    parser.add_argument('-r', '--retrain', help='Retrain model?', default=True, type=bool)
     parser.add_argument('-n', '--ntests', help='Number of tests', type=int, default=1)
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=modes)
     parser.add_argument('-p', '--permutations', help='Number of permutations', default=100, type=int)
@@ -267,10 +267,10 @@ if __name__ == '__main__':
                 )
 
                 # save model
-
-                model.save(m_path)
-                with open(osp.join(m_path, summary_txt), 'w') as f:
-                    f.write(model_summary)
+                if args.update:
+                    model.save(m_path)
+                    with open(osp.join(m_path, summary_txt), 'w') as f:
+                        f.write(model_summary)
 
             # calculate prediction error for non-permuted features of the class combination
 
