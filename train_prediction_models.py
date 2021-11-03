@@ -151,7 +151,7 @@ if __name__ == '__main__':
         min_errors = np.zeros(ntests)
         max_errors = np.zeros(ntests)
         aucs = np.zeros(ntests)
-        feature_importances = np.zeros((len(features), ntests))
+        feature_importances = np.zeros((len(all_features), ntests))
 
         for k in range(ntests):
             print(f'Test {k + 1}/{ntests}:')
@@ -329,7 +329,7 @@ if __name__ == '__main__':
 
                 for feature_i, feature in enumerate(features_selected):
 
-                    feature_idx = features.index(feature)
+                    feature_idx = all_features.index(feature)
                     lp = len(perm_idx)
                     error = np.zeros(lp)
 
@@ -433,11 +433,11 @@ if __name__ == '__main__':
             pfi = pd.read_csv(pfi_path)
         except:
             pfi = pd.DataFrame({
-                'Features': [tag for tag in features]
+                'Features': [tag for tag in all_features]
             })
 
         if model_type not in pfi.keys():
-            pfi[model_type] = [np.nan for feature in features]
+            pfi[model_type] = [np.nan for feature in all_features]
 
         # update prediction results
 
