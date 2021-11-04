@@ -26,9 +26,8 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--retrain', help='Retrain model?', default=True, type=bool)
     parser.add_argument('-n', '--ntests', help='Number of tests', type=int, default=1)
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=modes)
-    parser.add_argument('-p', '--permutations', help='Number of permutations', default=100, type=int)
     parser.add_argument('-u', '--update', help='Update results?', default=False, type=bool)
-    parser.add_argument('-f', '--features', help='Selected feature list in json format', default='less_correlated_pearson.json')
+    parser.add_argument('-f', '--features', help='Selected feature indexes in json format')
     args = parser.parse_args()
 
     # create output directories
@@ -57,10 +56,6 @@ if __name__ == '__main__':
             feature_indexes = json.load(f)
     except:
         feature_indexes = None
-
-    # permutation test
-
-    perm = False
 
     # number of tests
 
@@ -91,8 +86,7 @@ if __name__ == '__main__':
         all_features = meta['features']
         all_classes = meta['classes']
         if feature_indexes is not None:
-            features = [all_features[i] for i in feature_indexes]
-            classes = [all_classes[i] for i in feature_indexes]
+            features, classes = [all_features[i] for i in feature_indexes], [all_classes[i] for i in feature_indexes]
         else:
             features, classes = all_features.copy(), all_classes.copy()
         uclasses = np.sort(np.unique(classes))
@@ -308,51 +302,6 @@ if __name__ == '__main__':
                 print(f'Min absolute prediction error for combination {model_dc_comb}: {min_errors[k]}')
                 print(f'Max absolute prediction error for combination {model_dc_comb}: {max_errors[k]}')
 
-            # calculate prediction error for features permuted
-
-            if delay_class == 5 and args.permutations > 0:
-
-                # permutation flag
-
-                perm = True
-
-                # init permutations
-
-                n = len(Yi)
-                perm_idx = []
-                idx = np.arange(n)
-                for i in range(args.permutations):
-                    np.random.shuffle(idx)
-                    perm_idx.append(idx.copy())
-
-                # loop through tags
-
-                for feature_i, feature in enumerate(features_selected):
-
-                    feature_idx = all_features.index(feature)
-                    lp = len(perm_idx)
-                    error = np.zeros(lp)
-
-                    for i in range(lp):
-
-                        # permute
-
-                        Xp = Xi.copy()
-                        Xp[feature] = Xi[feature][perm_idx[i]]
-
-                        # predict and calculate inference statistics
-
-                        predictions = model.predict(Xp)
-                        if ae:
-                            error[i] = roc_auc(Yi, predictions) - aucs[k]
-                        else:
-                            predictions = predictions[br_key].flatten()
-                            error[i] = np.mean(np.abs(Yi - predictions))
-
-                    feature_importances[feature_idx, k] = np.mean(error) - mean_errors[k]
-                    if args.verbose:
-                        print(f'Importance of feature {feature_idx} ({feature}): {feature_importances[feature_idx, k]}')
-
         # results tables
 
         if ae:
@@ -426,24 +375,6 @@ if __name__ == '__main__':
                     br_key: [value for value in reals],
                 })
 
-        if args.features is not None:
-            prefix = args.features.split('.json')[0]
-        else:
-            prefix = ''
-
-        pfi_name = f'{prefix}_{permutation_importance_csv}'
-        pfi_path = osp.join(task_results_dir, pfi_name)
-
-        try:
-            pfi = pd.read_csv(pfi_path)
-        except:
-            pfi = pd.DataFrame({
-                'Features': [tag for tag in all_features]
-            })
-
-        if model_type not in pfi.keys():
-            pfi[model_type] = [np.nan for feature in all_features]
-
         # update prediction results
 
         if args.update:
@@ -467,17 +398,6 @@ if __name__ == '__main__':
 
             pr[model_name] = preds
             pr.to_csv(r_path, index=None)
-
-        # save permutation results
-
-        if perm:
-            perms = np.mean(feature_importances, axis=1)
-            pfi[model_type].values[:] = perms
-            pfi.to_csv(pfi_path, index=None)
-            idx = np.where(perms > 0)[0].tolist()
-            fname = f'{prefix}_more_important_{model_type}.json'
-            with open (osp.join(task_results_dir, fname), 'w') as f:
-                json.dump(idx, f)
 
 
 

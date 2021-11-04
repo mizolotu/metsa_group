@@ -41,7 +41,7 @@ def plot_multiple_bars(items, heights, hatches, figh, xlabel, ylabel, legend_ite
         pp.savefig(fpath, bbox_inches='tight')
     pp.close()
 
-def plot_bars(items, heights, hatches, items_for_argsort, figh, xlabel, ylabel, legend_items, legend_names, fpath, sort=False, reverse=False, xticks_rotation='horizontal', plot_png=False):
+def plot_bars(items, heights, hatches, items_for_argsort, figh, xlabel, ylabel, legend_items, legend_names, fpath, sort=False, reverse=False, xticks_rotation='horizontal', plot_png=False, figw=21.2):
     if sort:
         idx = np.argsort(items_for_argsort)
         if reverse:
@@ -50,7 +50,7 @@ def plot_bars(items, heights, hatches, items_for_argsort, figh, xlabel, ylabel, 
         heights = np.array(heights)[idx].tolist()
         hatches = np.array(hatches)[idx].tolist()
     print(f'First item and value at {fpath}: {items[0]} = {heights[0]}')
-    pp.figure(figsize=(21.2, figh))
+    pp.figure(figsize=(figw, figh))
     pp.bar(items, height=heights, color='white', edgecolor='black', hatch=hatches)
     pp.xlabel(xlabel, fontdict={'size': 12})
     pp.ylabel(ylabel, fontdict={'size': 12})
