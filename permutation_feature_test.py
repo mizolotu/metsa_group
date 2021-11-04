@@ -159,7 +159,7 @@ if __name__ == '__main__':
             nfeatures_selected.append(len(uc_features))
 
         xmin_selected = np.array([all_xmin[i] for i in feature_indexes])
-        xmax_selected = np.array([all_xmin[i] for i in feature_indexes])
+        xmax_selected = np.array([all_xmax[i] for i in feature_indexes])
         print(f'Feature {tagi + 1}/{len(all_features)}: Training using {len(features_selected)} features')
 
         # create model
@@ -188,8 +188,7 @@ if __name__ == '__main__':
             print(e)
 
             # train model
-            print(Xtv[stages[0]])
-            print(Ytv[stages[0]])
+
             model.fit(
                 Xtv[stages[0]], Ytv[stages[0]],
                 validation_data=(Xtv[stages[1]], Ytv[stages[1]]),
