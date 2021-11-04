@@ -146,7 +146,7 @@ if __name__ == '__main__':
         stage = stages[2]
         Xi = {}
         for fi, f in enumerate(all_features):
-            if fi not in feature_indexes:
+            if fi in feature_indexes:
                 Xi[f] = values_k[stage][:, fi]
             Yi = labels_k[stage]
 
