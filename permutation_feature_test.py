@@ -56,7 +56,7 @@ if __name__ == '__main__':
 
     # preprocess data
 
-    values = substitute_nan_values(values)
+    values_without_nans = substitute_nan_values(values)
 
     # create output directories
 
@@ -100,8 +100,8 @@ if __name__ == '__main__':
 
     # standardization coefficients
 
-    xmin = np.nanmin(values_k[stages[0]], axis=0)[:np.sum(all_nfeatures)]
-    xmax = np.nanmax(values_k[stages[0]], axis=0)[:np.sum(all_nfeatures)]
+    all_xmin = np.nanmin(values_k[stages[0]], axis=0)[:np.sum(all_nfeatures)]
+    all_xmax = np.nanmax(values_k[stages[0]], axis=0)[:np.sum(all_nfeatures)]
 
     # set seed
 
@@ -131,13 +131,10 @@ if __name__ == '__main__':
         for i in range(np.sum(all_nfeatures)):
             if i != tagi:
                 if args.correlation == 'pearson':
-                    corr_xx[i] = np.abs(np.corrcoef(values[:, tagi], values[:, i])[0, 1])
+                    corr_xx[i] = np.abs(np.corrcoef(values_without_nans[:, tagi], values_without_nans[:, i])[0, 1])
                 elif args.correlation == 'spearman':
-                    corr_xx[i], _ = np.abs(spearmanr(values[:, tagi], values[:, i]))
-        print(corr_xx)
+                    corr_xx[i], _ = np.abs(spearmanr(values_without_nans[:, tagi], values_without_nans[:, i]))
         feature_indexes = np.where(corr_xx < args.max)[0].tolist()
-
-        print(feature_indexes)
 
         Xtv, Ytv = {}, {}
         for stage in stages[:-1]:
@@ -161,16 +158,15 @@ if __name__ == '__main__':
             uc_features = [f for f, c in zip(features_selected, classes_selected) if c == uc]
             nfeatures_selected.append(len(uc_features))
 
-        xmin_selected = np.array([xmin[i] for i in feature_indexes])
-        xmax_selected = np.array([xmin[i] for i in feature_indexes])
-        print(f'{tagi + 1}/{len(all_features)} Training using {len(features_selected)} features')
+        xmin_selected = np.array([all_xmin[i] for i in feature_indexes])
+        xmax_selected = np.array([all_xmin[i] for i in feature_indexes])
+        print(f'Feature {tagi + 1}/{len(all_features)}: Training using {len(features_selected)} features')
 
         # create model
 
         inputs, inputs_processed = model_input(features_selected, xmin_selected, xmax_selected)
         hidden = split(inputs_processed, nfeatures_selected)
         extractor_type = locals()[args.extractor]
-        extractor_type = locals()[model_type]
         hidden = extractor_type(hidden)
         model = model_output(inputs, hidden, br_key, ymin, ymax)
 
