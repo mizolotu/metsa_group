@@ -240,5 +240,5 @@ if __name__ == '__main__':
 
         perm = np.mean(feature_importance)
         idx = np.where(p['Features'].values == tag)[0]
-        p[model_type].values[i] = perm
+        p[model_type].values[idx] = perm
         p.to_csv(r_path, index=None)
