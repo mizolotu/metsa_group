@@ -172,7 +172,7 @@ if __name__ == '__main__':
 
         # create model and results directories
 
-        m_name = f'{model_type}_permuted_{tag}'
+        m_name = f'{model_type}_{args.correlation}_{tag}'
         m_path = osp.join(model_mode_dir, m_name)
         if not osp.isdir(m_path):
             os.mkdir(m_path)
@@ -231,7 +231,7 @@ if __name__ == '__main__':
 
             predictions = model.predict(Xp)
             predictions = predictions[br_key].flatten()
-            feature_importance[i] = np.mean(np.abs(Yi - predictions)) - error
+            feature_importance[i] = np.mean(np.abs(Yi - predictions)) / error
 
         if args.verbose:
             print(f'Importance of feature {tagi} ({tag}): {np.mean(feature_importance)}')
