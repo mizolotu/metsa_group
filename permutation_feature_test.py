@@ -188,7 +188,8 @@ if __name__ == '__main__':
             print(e)
 
             # train model
-
+            print(Xtv[stages[0]][0, :])
+            print(Ytv[stages[0]][0])
             model.fit(
                 Xtv[stages[0]], Ytv[stages[0]],
                 validation_data=(Xtv[stages[1]], Ytv[stages[1]]),
