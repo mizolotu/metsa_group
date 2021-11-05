@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
     # results table
 
-    r_name = permutation_importance_csv
+    r_name = permutation_importance_csv.format(args.correlation)
     r_path = osp.join(task_results_dir, r_name)
     try:
         p = pd.read_csv(r_path)

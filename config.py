@@ -17,7 +17,7 @@ xy_correlation_csv = 'feature_vs_target_correlation.csv'
 less_correlated_json = 'less_correlated_{0}.json'
 
 prediction_importance_csv = 'prediction_importance.csv'
-permutation_importance_csv = 'permutation_importance.csv'
+permutation_importance_csv = 'permutation_importance_{0}.csv'
 
 prediction_results_fname = 'prediction_results.csv'
 prediction_mean_errors_fname = 'prediction_mean_errors.csv'
