@@ -21,7 +21,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-g', '--gpu', help='GPU to use', default='0')
     parser.add_argument('-v', '--verbose', help='Verbose', default=False, type=bool)
-    parser.add_argument('-x', '--max', help='Maximum allowed featuer-to-feature correlation', default=0.20, type=float)
+    parser.add_argument('-x', '--max', help='Maximum allowed featuer-to-feature correlation', default=0.50, type=float)
     parser.add_argument('-c', '--correlation', help='Correlation type', default='pearson')
     parser.add_argument('-p', '--permutations', help='Number of permutations', default=100, type=int)
 
@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
     # results table
 
-    r_name = permutation_importance_csv.format(args.correlation) + '_tmp'
+    r_name = permutation_importance_csv.format(args.correlation)
     r_path = osp.join(task_results_dir, r_name)
     try:
         p = pd.read_csv(r_path)
@@ -172,8 +172,7 @@ if __name__ == '__main__':
 
         # create model and results directories
 
-        #m_name = f'{model_type}_{args.correlation}_{tag}'
-        m_name = f'{model_type}_{tag}_tmp'
+        m_name = f'{model_type}_{args.correlation}_{tag}'
         m_path = osp.join(model_mode_dir, m_name)
         if not osp.isdir(m_path):
             os.mkdir(m_path)
