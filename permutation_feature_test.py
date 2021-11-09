@@ -69,7 +69,10 @@ if __name__ == '__main__':
 
     # results table
 
-    r_name = permutation_importance_csv.format(args.correlation)
+    if args.max > 0:
+        r_name = permutation_importance_csv.format(args.correlation)
+    else:
+        r_name = permutation_importance_csv.format('all')
     r_path = osp.join(task_results_dir, r_name)
     try:
         p = pd.read_csv(r_path)
@@ -179,34 +182,22 @@ if __name__ == '__main__':
         if args.verbose:
             model.summary()
 
-        # load model
+        # train model
 
-        try:
-            model = tf.keras.models.load_model(m_path)
-
-        except Exception as e:
-            print(e)
-
-            # train model
-
-            model.fit(
-                Xtv[stages[0]], Ytv[stages[0]],
-                validation_data=(Xtv[stages[1]], Ytv[stages[1]]),
-                epochs=epochs,
-                verbose=args.verbose,
-                batch_size=batch_size,
-                callbacks=[tf.keras.callbacks.EarlyStopping(
-                    monitor='val_loss',
-                    verbose=0,
-                    patience=patience,
-                    mode='min',
-                    restore_best_weights=True
-                )]
-            )
-
-            # save model
-
-            model.save(m_path)
+        model.fit(
+            Xtv[stages[0]], Ytv[stages[0]],
+            validation_data=(Xtv[stages[1]], Ytv[stages[1]]),
+            epochs=epochs,
+            verbose=args.verbose,
+            batch_size=batch_size,
+            callbacks=[tf.keras.callbacks.EarlyStopping(
+                monitor='val_loss',
+                verbose=0,
+                patience=patience,
+                mode='min',
+                restore_best_weights=True
+            )]
+        )
 
         # predict and calculate inference statistics
 
