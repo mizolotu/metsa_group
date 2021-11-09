@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
     # results table
 
-    if args.max > 0:
+    if args.max >= 1.0:
         r_name = permutation_importance_csv.format(args.correlation)
     else:
         r_name = permutation_importance_csv.format('all')
