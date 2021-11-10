@@ -248,6 +248,7 @@ if __name__ == '__main__':
 
     # save important features
 
-    fname = permutation_important_json.format(args.correlation, model_type)
+    dcs = ','.join([str(item) for item in args.delays])
+    fname = permutation_important_json.format(args.correlation, model_type, dcs)
     with open(osp.join(task_results_dir, fname), 'w') as f:
         json.dump(important_features, f)
