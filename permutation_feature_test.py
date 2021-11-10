@@ -18,7 +18,7 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Train classifiers')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=modes)
-    parser.add_argument('-d', '--delay', help='Delay class', default=1, type=int)
+    parser.add_argument('-d', '--delay', help='Delay class', default=5, type=int)
     parser.add_argument('-e', '--extractor', help='Feature extractor', default='cnn1', choices=['mlp', 'cnn1', 'lstm', 'bilstm', 'cnn1lstm'])
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-g', '--gpu', help='GPU to use', default='0')
@@ -75,9 +75,9 @@ if __name__ == '__main__':
     # results table
 
     if corr_thr < 1.0:
-        r_name = permutation_importance_csv.format(args.correlation)
+        r_name = permutation_importance_csv.format(args.correlation, args.delay)
     else:
-        r_name = permutation_importance_csv.format('all')
+        r_name = permutation_importance_csv.format('all', args.delay)
     r_path = osp.join(task_results_dir, r_name)
     try:
         p = pd.read_csv(r_path)
@@ -130,7 +130,7 @@ if __name__ == '__main__':
 
     for tagi, tag in enumerate(all_features):
 
-        if all_classes[tagi] == args.delay:
+        if all_classes[tagi] <= args.delay:
 
             # ymin and ymax
 
