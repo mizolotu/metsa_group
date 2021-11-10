@@ -75,9 +75,10 @@ if __name__ == '__main__':
     # results table
 
     if corr_thr < 1.0:
-        r_name = permutation_importance_csv.format(args.correlation, args.delay)
+        corr_tag = args.correlation
     else:
-        r_name = permutation_importance_csv.format('all', args.delay)
+        corr_tag = 'all'
+    r_name = permutation_importance_csv.format(corr_tag, args.delay)
     r_path = osp.join(task_results_dir, r_name)
     try:
         p = pd.read_csv(r_path)
@@ -183,13 +184,6 @@ if __name__ == '__main__':
             extractor_type = locals()[args.extractor]
             hidden = extractor_type(hidden)
             model = model_output(inputs, hidden, br_key, ymin, ymax)
-
-            # create model and results directories
-
-            m_name = f'{model_type}_{args.correlation}_{tag}'
-            m_path = osp.join(model_mode_dir, m_name)
-            if not osp.isdir(m_path):
-                os.mkdir(m_path)
             if args.verbose:
                 model.summary()
 
@@ -248,6 +242,6 @@ if __name__ == '__main__':
 
     # save important features
 
-    fname = permutation_important_json.format(args.correlation, model_type, args.delay)
+    fname = permutation_important_json.format(corr_tag, model_type, args.delay)
     with open(osp.join(task_results_dir, fname), 'w') as f:
         json.dump(important_features, f)
