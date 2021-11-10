@@ -18,7 +18,7 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Train classifiers')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=modes)
-    parser.add_argument('-d', '--delays', help='Delay classes', default=[1, 2, 3, 4, 5], nargs='+', type=int)
+    parser.add_argument('-d', '--delay', help='Delay class', default=1, type=int)
     parser.add_argument('-e', '--extractor', help='Feature extractor', default='cnn1', choices=['mlp', 'cnn1', 'lstm', 'bilstm', 'cnn1lstm'])
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-g', '--gpu', help='GPU to use', default='0')
@@ -130,7 +130,7 @@ if __name__ == '__main__':
 
     for tagi, tag in enumerate(all_features):
 
-        if all_classes[tagi] in args.delays:
+        if all_classes[tagi] == args.delay:
 
             # ymin and ymax
 
@@ -141,7 +141,7 @@ if __name__ == '__main__':
 
             corr_xx = np.zeros(np.sum(all_nfeatures))
             for i in range(np.sum(all_nfeatures)):
-                if all_classes[i] not in args.delays:
+                if all_classes[i] > args.delay:
                     corr_xx[i] = 1.0
                 elif i != tagi:
                     if args.correlation == 'pearson':
@@ -248,7 +248,6 @@ if __name__ == '__main__':
 
     # save important features
 
-    dcs = ','.join([str(item) for item in args.delays])
-    fname = permutation_important_json.format(args.correlation, model_type, dcs)
+    fname = permutation_important_json.format(args.correlation, model_type, args.delay)
     with open(osp.join(task_results_dir, fname), 'w') as f:
         json.dump(important_features, f)
