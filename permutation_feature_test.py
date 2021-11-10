@@ -1,3 +1,4 @@
+import json
 import os
 import os.path as osp
 import pandas as pd
@@ -17,15 +18,19 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Train classifiers')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=modes)
+    parser.add_argument('-d', '--delays', help='Delay classes', default=[1,2,3,4,5], nargs='+')
     parser.add_argument('-e', '--extractor', help='Feature extractor', default='cnn1', choices=['mlp', 'cnn1', 'lstm', 'bilstm', 'cnn1lstm'])
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-g', '--gpu', help='GPU to use', default='0')
     parser.add_argument('-v', '--verbose', help='Verbose', default=False, type=bool)
-    parser.add_argument('-x', '--max', help='Maximum allowed featuer-to-feature correlation', default=0.50, type=float)
+    parser.add_argument('-x', '--max', help='Maximum allowed featuer-to-feature correlation', default=0.25, type=float)
     parser.add_argument('-c', '--correlation', help='Correlation type', default='pearson')
     parser.add_argument('-p', '--permutations', help='Number of permutations', default=100, type=int)
-
     args = parser.parse_args()
+
+    # corr thr
+
+    corr_thr = np.minimum(1.0, args.max)
 
     # gpu
 
@@ -69,7 +74,7 @@ if __name__ == '__main__':
 
     # results table
 
-    if args.max < 1.0:
+    if corr_thr < 1.0:
         r_name = permutation_importance_csv.format(args.correlation)
     else:
         r_name = permutation_importance_csv.format('all')
@@ -119,117 +124,130 @@ if __name__ == '__main__':
         np.random.shuffle(idx)
         perm_idx.append(idx.copy())
 
+    important_features = []
+
     # loop through features
 
     for tagi, tag in enumerate(all_features):
 
-        # ymin and ymax
+        if all_classes[tagi] in args.delays:
 
-        ymin = br_min
-        ymax = br_max
+            # ymin and ymax
 
-        # eliminate correlated features
+            ymin = br_min
+            ymax = br_max
 
-        corr_xx = np.zeros(np.sum(all_nfeatures))
-        for i in range(np.sum(all_nfeatures)):
-            if i != tagi:
-                if args.correlation == 'pearson':
-                    corr_xx[i] = np.abs(np.corrcoef(values_without_nans[:, tagi], values_without_nans[:, i])[0, 1])
-                elif args.correlation == 'spearman':
-                    corr_xx[i], _ = np.abs(spearmanr(values_without_nans[:, tagi], values_without_nans[:, i]))
-        feature_indexes = np.where(corr_xx < args.max)[0].tolist()
+            # eliminate correlated features
 
-        Xtv, Ytv = {}, {}
-        for stage in stages[:-1]:
-            Xtv[stage], Ytv[stage] = {}, {}
+            corr_xx = np.zeros(np.sum(all_nfeatures))
+            for i in range(np.sum(all_nfeatures)):
+                if all_classes[i] not in args.delays:
+                    corr_xx[i] = 1.0
+                elif i != tagi:
+                    if args.correlation == 'pearson':
+                        corr_xx[i] = np.abs(np.corrcoef(values_without_nans[:, tagi], values_without_nans[:, i])[0, 1])
+                    elif args.correlation == 'spearman':
+                        corr_xx[i], _ = np.abs(spearmanr(values_without_nans[:, tagi], values_without_nans[:, i]))
+            feature_indexes = np.where(corr_xx < corr_thr)[0].tolist()
+
+            Xtv, Ytv = {}, {}
+            for stage in stages[:-1]:
+                Xtv[stage], Ytv[stage] = {}, {}
+                for fi, f in enumerate(all_features):
+                    if fi in feature_indexes:
+                        Xtv[stage][f] = values_k[stage][:, fi]
+                Ytv[stage][br_key] = labels_k[stage]
+            stage = stages[2]
+            Xi = {}
             for fi, f in enumerate(all_features):
                 if fi in feature_indexes:
-                    Xtv[stage][f] = values_k[stage][:, fi]
-            Ytv[stage][br_key] = labels_k[stage]
-        stage = stages[2]
-        Xi = {}
-        for fi, f in enumerate(all_features):
-            if fi in feature_indexes:
-                Xi[f] = values_k[stage][:, fi]
-            Yi = labels_k[stage]
+                    Xi[f] = values_k[stage][:, fi]
+                Yi = labels_k[stage]
 
-        features_selected = [all_features[i] for i in feature_indexes]
-        classes_selected = [all_classes[i] for i in feature_indexes]
-        uclasses_selected = np.sort(np.unique(classes_selected))
-        nfeatures_selected = []
-        for uc in uclasses_selected:
-            uc_features = [f for f, c in zip(features_selected, classes_selected) if c == uc]
-            nfeatures_selected.append(len(uc_features))
+            features_selected = [all_features[i] for i in feature_indexes]
+            classes_selected = [all_classes[i] for i in feature_indexes]
+            uclasses_selected = np.sort(np.unique(classes_selected))
+            nfeatures_selected = []
+            for uc in uclasses_selected:
+                uc_features = [f for f, c in zip(features_selected, classes_selected) if c == uc]
+                nfeatures_selected.append(len(uc_features))
 
-        xmin_selected = np.array([all_xmin[i] for i in feature_indexes])
-        xmax_selected = np.array([all_xmax[i] for i in feature_indexes])
-        print(f'Feature {tagi + 1}/{len(all_features)}: Training using {len(features_selected)} features')
+            xmin_selected = np.array([all_xmin[i] for i in feature_indexes])
+            xmax_selected = np.array([all_xmax[i] for i in feature_indexes])
+            print(f'Feature {tagi + 1}/{len(all_features)}: Training using {len(features_selected)} features')
 
-        # create model
+            # create model
 
-        inputs, inputs_processed = model_input(features_selected, xmin_selected, xmax_selected)
-        hidden = split(inputs_processed, nfeatures_selected)
-        extractor_type = locals()[args.extractor]
-        hidden = extractor_type(hidden)
-        model = model_output(inputs, hidden, br_key, ymin, ymax)
+            inputs, inputs_processed = model_input(features_selected, xmin_selected, xmax_selected)
+            hidden = split(inputs_processed, nfeatures_selected)
+            extractor_type = locals()[args.extractor]
+            hidden = extractor_type(hidden)
+            model = model_output(inputs, hidden, br_key, ymin, ymax)
 
-        # create model and results directories
+            # create model and results directories
 
-        m_name = f'{model_type}_{args.correlation}_{tag}'
-        m_path = osp.join(model_mode_dir, m_name)
-        if not osp.isdir(m_path):
-            os.mkdir(m_path)
-        if args.verbose:
-            model.summary()
+            m_name = f'{model_type}_{args.correlation}_{tag}'
+            m_path = osp.join(model_mode_dir, m_name)
+            if not osp.isdir(m_path):
+                os.mkdir(m_path)
+            if args.verbose:
+                model.summary()
 
-        # train model
+            # train model
 
-        model.fit(
-            Xtv[stages[0]], Ytv[stages[0]],
-            validation_data=(Xtv[stages[1]], Ytv[stages[1]]),
-            epochs=epochs,
-            verbose=args.verbose,
-            batch_size=batch_size,
-            callbacks=[tf.keras.callbacks.EarlyStopping(
-                monitor='val_loss',
-                verbose=0,
-                patience=patience,
-                mode='min',
-                restore_best_weights=True
-            )]
-        )
-
-        # predict and calculate inference statistics
-
-        t_test = 0
-        predictions = model.predict(Xi)
-        predictions = predictions[br_key].flatten()
-        error = np.mean(np.abs(Yi - predictions))
-
-        # permute
-
-        lp = len(perm_idx)
-        feature_importance = np.zeros(lp)
-
-        for i in range(lp):
-
-            # permute
-
-            Xp = Xi.copy()
-            Xp[tag] = Xi[tag][perm_idx[i]]
+            model.fit(
+                Xtv[stages[0]], Ytv[stages[0]],
+                validation_data=(Xtv[stages[1]], Ytv[stages[1]]),
+                epochs=epochs,
+                verbose=args.verbose,
+                batch_size=batch_size,
+                callbacks=[tf.keras.callbacks.EarlyStopping(
+                    monitor='val_loss',
+                    verbose=0,
+                    patience=patience,
+                    mode='min',
+                    restore_best_weights=True
+                )]
+            )
 
             # predict and calculate inference statistics
 
-            predictions = model.predict(Xp)
+            t_test = 0
+            predictions = model.predict(Xi)
             predictions = predictions[br_key].flatten()
-            feature_importance[i] = np.mean(np.abs(Yi - predictions)) / error
+            error = np.mean(np.abs(Yi - predictions))
 
-        if args.verbose:
-            print(f'Importance of feature {tagi} ({tag}): {np.mean(feature_importance)}')
+            # permute
 
-        # save permutation results
+            lp = len(perm_idx)
+            feature_importance = np.zeros(lp)
 
-        perm = np.mean(feature_importance)
-        idx = np.where(p['Features'].values == tag)[0]
-        p[model_type].values[idx] = perm
-        p.to_csv(r_path, index=None)
+            for i in range(lp):
+                # permute
+
+                Xp = Xi.copy()
+                Xp[tag] = Xi[tag][perm_idx[i]]
+
+                # predict and calculate inference statistics
+
+                predictions = model.predict(Xp)
+                predictions = predictions[br_key].flatten()
+                feature_importance[i] = np.mean(np.abs(Yi - predictions)) / error
+
+            if args.verbose:
+                print(f'Importance of feature {tagi} ({tag}): {np.mean(feature_importance)}')
+
+            # save permutation results
+
+            perm = np.mean(feature_importance)
+            if perm >= 1.0:
+                important_features.append(tag)
+            idx = np.where(p['Features'].values == tag)[0]
+            p[model_type].values[idx] = perm
+            p.to_csv(r_path, index=None)
+
+    # save important features
+
+    fname = permutation_important_json.formt(args.corr, model_type)
+    with open(osp.join(task_results_dir, fname), 'w') as f:
+        json.dump(important_features, f)
