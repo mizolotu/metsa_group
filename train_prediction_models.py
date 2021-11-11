@@ -95,6 +95,7 @@ if __name__ == '__main__':
         meta = load_meta(osp.join(task_dir, meta_fname))
         all_features = meta['features']
         all_classes = meta['classes']
+        all_uclasses = np.sort(np.unique(all_classes))
         if features is not None:
             classes = [c for f, c in zip(all_features, all_classes) if f in features]
         else:
@@ -105,7 +106,7 @@ if __name__ == '__main__':
         nfeatures = []
         dcs = []
         tbl_dc_combs = []
-        for uc in uclasses:
+        for uc in all_uclasses:
             dcs.extend(str(uc))
             dc_comb = ','.join([item for item in dcs])
             tbl_dc_combs.append(dc_comb)
