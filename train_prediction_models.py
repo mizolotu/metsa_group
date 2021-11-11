@@ -27,7 +27,7 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--ntests', help='Number of tests', type=int, default=1)
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=modes)
     parser.add_argument('-u', '--update', help='Update results?', default=False, type=bool)
-    parser.add_argument('-f', '--features', help='Selected feature indexes in json format', default=['permutation_important_all_cnn1_4.json', 'permutation_important_all_cnn1_5.json'])
+    parser.add_argument('-f', '--features', help='List of the features selected in json format', default=['permutation_important_all_cnn1_4.json', 'permutation_important_all_cnn1_5.json'])
     args = parser.parse_args()
 
     # create output directories
@@ -54,17 +54,17 @@ if __name__ == '__main__':
     model_prefixes = []
     if args.features is not None:
         assert len(args.features) == len(args.classes), 'There should be file with feature indexes for every delay class tested'
-        feature_indexes_list = []
+        feature_list = []
         for fname in args.features:
             try:
                 with open(osp.join(task_results_dir, fname)) as f:
-                    feature_indexes_list.append(json.load(f))
+                    feature_list.append(json.load(f))
                     model_prefixes.append(f"{fname.split('.json')[0]}_")
             except:
-                feature_indexes_list.append(None)
+                feature_list.append(None)
                 model_prefixes.append('')
     else:
-        feature_indexes_list = [None for _ in args.classes]
+        feature_list = [None for _ in args.classes]
         model_prefixes.append('')
 
     # number of tests
@@ -83,7 +83,7 @@ if __name__ == '__main__':
 
     # walk through classes
 
-    for delay_class, feature_indexes, model_prefix in zip(args.classes, feature_indexes_list, model_prefixes):
+    for delay_class, features, model_prefix in zip(args.classes, feature_list, model_prefixes):
 
         # set seed for results reproduction
 
@@ -95,8 +95,8 @@ if __name__ == '__main__':
         meta = load_meta(osp.join(task_dir, meta_fname))
         all_features = meta['features']
         all_classes = meta['classes']
-        if feature_indexes is not None:
-            features, classes = [all_features[i] for i in feature_indexes], [all_classes[i] for i in feature_indexes]
+        if features is not None:
+            classes = [c for f, c in zip(all_features, all_classes) if f in features]
         else:
             features, classes = all_features.copy(), all_classes.copy()
         uclasses = np.sort(np.unique(classes))
