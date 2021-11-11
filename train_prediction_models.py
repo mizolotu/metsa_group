@@ -18,7 +18,7 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Train prediction models')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-e', '--extractor', help='Feature extractor', default='cnn1', choices=['mlp', 'cnn1', 'lstm', 'bilstm', 'cnn1lstm', 'aen', 'som'])
-    parser.add_argument('-c', '--classes', help='Delay class when prediction starts', type=int, nargs='+', default=[5])
+    parser.add_argument('-c', '--classes', help='Delay class when prediction starts', type=int, nargs='+', default=[4, 5])
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=seed)
     parser.add_argument('-g', '--gpu', help='GPU to use', default='0')
     parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
@@ -27,7 +27,7 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--ntests', help='Number of tests', type=int, default=1)
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=modes)
     parser.add_argument('-u', '--update', help='Update results?', default=False, type=bool)
-    parser.add_argument('-f', '--features', help='Selected feature indexes in json format')
+    parser.add_argument('-f', '--features', help='Selected feature indexes in json format', default=['permutation_important_all_cnn1_4.json', 'permutation_important_all_cnn1_5.json'])
     args = parser.parse_args()
 
     # create output directories
@@ -51,11 +51,21 @@ if __name__ == '__main__':
 
     # feature indexes
 
-    try:
-        with open(osp.join(task_results_dir, args.features)) as f:
-            feature_indexes = json.load(f)
-    except:
-        feature_indexes = None
+    model_prefixes = []
+    if args.features is not None:
+        assert len(args.features) == len(args.classes), 'There should be file with feature indexes for every delay class tested'
+        feature_indexes_list = []
+        for fname in args.features:
+            try:
+                with open(osp.join(task_results_dir, fname)) as f:
+                    feature_indexes_list.append(json.load(f))
+                    model_prefixes.append(f"{fname.split('.json')[0]}_")
+            except:
+                feature_indexes_list.append(None)
+                model_prefixes.append('')
+    else:
+        feature_indexes_list = [None for _ in args.classes]
+        model_prefixes.append('')
 
     # number of tests
 
@@ -73,7 +83,7 @@ if __name__ == '__main__':
 
     # walk through classes
 
-    for delay_class in args.classes:
+    for delay_class, feature_indexes, model_prefix in zip(args.classes, feature_indexes_list, model_prefixes):
 
         # set seed for results reproduction
 
@@ -116,7 +126,7 @@ if __name__ == '__main__':
 
         # model name
 
-        model_type = f'{feature_extractor}'
+        model_type = f'{model_prefix}{feature_extractor}'
         model_name = f'{model_type}_{delay_class}'
 
         # create model directory

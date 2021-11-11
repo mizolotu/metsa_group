@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 from matplotlib import pyplot as pp
 
@@ -41,7 +42,12 @@ def plot_multiple_bars(items, heights, hatches, figh, xlabel, ylabel, legend_ite
         pp.savefig(fpath, bbox_inches='tight')
     pp.close()
 
-def plot_bars(items, heights, hatches, items_for_argsort, figh, xlabel, ylabel, legend_items, legend_names, fpath, sort=False, reverse=False, xticks_rotation='horizontal', plot_png=False, figw=21.2):
+def plot_bars(items, heights, hatches, items_for_argsort, figh, xlabel, ylabel, legend_items, legend_names, fpath, sort=False, reverse=False, xticks_rotation='horizontal', plot_png=False, figw=21.2, nan_mask=0):
+    non_nan_idx = np.where(~pd.isna(heights))
+    heights[np.where(pd.isna(heights))] = nan_mask
+    ydelta = np.max(heights[non_nan_idx]) - np.min(heights[non_nan_idx])
+    hmin, hmax = np.min(heights[non_nan_idx]) - 0.05 * ydelta, np.max(heights[non_nan_idx]) + 0.05 * ydelta
+    items_for_argsort[np.where(pd.isna(items_for_argsort))] = nan_mask
     if sort:
         idx = np.argsort(items_for_argsort)
         if reverse:
@@ -56,8 +62,7 @@ def plot_bars(items, heights, hatches, items_for_argsort, figh, xlabel, ylabel, 
     pp.ylabel(ylabel, fontdict={'size': 12})
     pp.xticks(fontsize=12, rotation=xticks_rotation)
     pp.yticks(fontsize=12)
-    ydelta = np.max(heights) - np.min(heights)
-    pp.ylim([np.min(heights) - 0.05 * ydelta, np.max(heights) + 0.05 * ydelta])
+    pp.ylim([hmin, hmax])
     if len(legend_items) > 0 and len(legend_names) > 0:
         pp.legend(legend_items, legend_names, prop={'size': 12})
     pp.savefig(fpath, bbox_inches='tight')

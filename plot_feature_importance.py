@@ -17,7 +17,15 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-w', '--width', help='Figure width', type=float, default=21.2)
     parser.add_argument('-a', '--anonymize', help='Anonymize?', type=bool, default=False)
+    parser.add_argument('-c', '--correlation', help='Correlation', default='pearson')
     args = parser.parse_args()
+
+    # feature elimination metric
+
+    if args.correlation is None:
+        elim = 'all'
+    else:
+        elim = args.correlation
 
     # directories and meta
 
@@ -61,8 +69,12 @@ if __name__ == '__main__':
 
     # file list
 
+    fname_list_all = [xy_correlation_csv]
+    for c in np.unique(classes):
+        fname_list_all.append(permutation_importance_csv.format(elim, c))
+
     fname_list = []
-    for fname in [xy_correlation_csv, prediction_importance_csv, permutation_importance_csv.format('pearson'), permutation_importance_csv.format('spearman')]:
+    for fname in fname_list_all:
     #for fname in [xy_correlation_csv, prediction_importance_csv, permutation_importance_csv.format('all')]:
         if osp.isfile(osp.join(task_results_dir, fname)):
             fname_list.append(fname)
@@ -77,6 +89,7 @@ if __name__ == '__main__':
     names = []
     fighs = []
     ylabels = []
+    categories = []
     for fname in fname_list:
         fpath = osp.join(results_dir, args.task, fname)
         p = pd.read_csv(fpath)
@@ -87,14 +100,16 @@ if __name__ == '__main__':
                 data_to_sort.append(np.abs(errors))
                 fighs.append(12)
                 ylabels.append('Correlation')
+                categories.append(0)
             else:
                 data_to_sort.append(errors)
-                if fname.startswith(permutation_importance_csv.format('').split('.csv')[0]):
+                if fname.startswith(permutation_importance_csv.format('', '').split('_')[0]):
                     ylabels.append('Permutation feature importance')
                     fighs.append(6)
                 elif fname == prediction_importance_csv:
                     ylabels.append('Prediction error')
                     fighs.append(6)
+                categories.append(int(fname.split('_')[-1].split('.csv')[0]))
             if fname == prediction_importance_csv and col == 0:
                 reverses.append(False)
             else:
@@ -105,22 +120,31 @@ if __name__ == '__main__':
 
     # plot results
 
-    S = []
-    for items, items_as, name, figh, ylabel, reverse in zip(data, data_to_sort, names, fighs, ylabels, reverses):
+    S = {c: [] for c in np.unique(classes)}
+    for category, items, items_as, name, figh, ylabel, reverse in zip(categories, data, data_to_sort, names, fighs, ylabels, reverses):
         fpath = osp.join(task_figures_dir, f'{name}{postfix}{pdf}')
-        plot_bars(feature_names, items, hatches, items_as, figh, xlabel, ylabel, legend_items, legend_names, fpath, sort=True, reverse=reverse, xticks_rotation='vertical', figw=args.width)
-        if np.all(pd.isna(items) == False):
+        plot_bars(feature_names, items.copy(), hatches, items_as.copy(), figh, xlabel, ylabel, legend_items, legend_names, fpath, sort=True, reverse=reverse, xticks_rotation='vertical', figw=args.width)
+        s = items_as
+        if category == 0:
+            for c in np.unique(classes):
+                S[c].append(s)
+        else:
+            S[category].append(s)
+        if 0: #  np.all(pd.isna(items) == False):
             if reverse:
                 s = items_as
             else:
                 s = 1 / items_as
-            S.append(s)
-    S = np.vstack(S)
+            if np.all(~pd.isna(s)):
+                S[category].append(s)
+    for c in np.unique(classes):
+        S[c] = np.vstack(S[c])
 
     # rank features
 
     #S = S / np.sum(S, 1)[:, None]
-    S = (S - np.min(S, 1)[:, None]) / (np.max(S, 1)[:, None] - np.min(S, 1)[:, None] + 1e-10)
-    S = np.sum(S, 0)
-    fpath = osp.join(task_figures_dir, f'features_ranked{postfix}{pdf}')
-    plot_bars(feature_names, S, hatches, S, 7, xlabel, 'Feature importance score', legend_items, legend_names, fpath, sort=True, reverse=True, xticks_rotation='vertical', figw=args.width)
+    for c in np.unique(classes):
+        S[c] = (S[c] - np.nanmin(S[c], 1)[:, None]) / (np.nanmax(S[c], 1)[:, None] - np.nanmin(S[c], 1)[:, None] + 1e-10)
+        S[c] = np.nansum(S[c], 0)
+        fpath = osp.join(task_figures_dir, f'features_ranked{postfix}_{c}{pdf}')
+        plot_bars(feature_names, S[c], hatches, S[c], 7, xlabel, 'Feature importance score', legend_items, legend_names, fpath, sort=True, reverse=True, xticks_rotation='vertical', figw=args.width)

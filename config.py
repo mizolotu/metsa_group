@@ -15,7 +15,7 @@ xx_pearson_correlation_csv = 'feature_vs_feature_pearson_correlation.csv'
 xx_spearman_correlation_csv = 'feature_vs_feature_spearman_correlation.csv'
 xy_correlation_csv = 'feature_vs_target_correlation.csv'
 
-prediction_importance_csv = 'prediction_importance.csv'
+prediction_importance_csv = 'prediction_importance_{0}.csv'
 permutation_importance_csv = 'permutation_importance_{0}_{1}.csv'
 permutation_important_json = 'permutation_important_{0}_{1}_{2}.json'
 

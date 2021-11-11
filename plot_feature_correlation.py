@@ -53,7 +53,7 @@ if __name__ == '__main__':
             ac[i] = 0
             sortedidx = np.argsort(ac)[::-1]
             for j in range(10):
-                print(i + 1, features[i], ac[sortedidx[j]], 1 + sortedidx[j], features[sortedidx[j]])
+                print(i + 1, features[i], ac[sortedidx[j]], 1 + sortedidx[j], features[sortedidx[j]], classes[sortedidx[j]])
 
 
     # data frames and colormap

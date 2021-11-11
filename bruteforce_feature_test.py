@@ -19,7 +19,8 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-g', '--gpu', help='GPU to use', default='0')
     parser.add_argument('-v', '--verbose', help='Verbose', default=False, type=bool)
-    parser.add_argument('-e', '--evalmethod', help='Evaluation method', choices=['selected', 'not-selected', 'permuted'], default='permuted')
+    parser.add_argument('-e', '--evalmethod', help='Evaluation method', choices=['selected', 'not-selected', 'permuted'], default='not-selected')
+    parser.add_argument('-d', '--delay', help='Delay class', default=4, type=int)
     args = parser.parse_args()
 
     # gpu
@@ -56,7 +57,7 @@ if __name__ == '__main__':
 
     # results table
 
-    r_name = prediction_importance_csv
+    r_name = prediction_importance_csv.format(args.delay)
     r_path = osp.join(task_results_dir, r_name)
     try:
         p = pd.read_csv(r_path)
@@ -94,113 +95,109 @@ if __name__ == '__main__':
 
     for tagi, tag in enumerate(features):
 
-        # set seed
+        if classes[tagi] <= args.delay:
 
-        set_seeds(args.seed)
+            # set seed
 
-        # ymin and ymax
+            set_seeds(args.seed)
 
-        ymin = br_min
-        ymax = br_max
+            # ymin and ymax
 
-        # features
+            ymin = br_min
+            ymax = br_max
 
-        if args.evalmethod == 'selected':
-            Xtv, Ytv = {}, {}
-            for stage in stages[:-1]:
-                Xtv[stage], Ytv[stage] = {}, {}
-                Xtv[stage][tag] = values_k[stage][:, tagi]
-                Ytv[stage][br_key] = labels_k[stage]
-            stage = stages[2]
-            Xi = {}
-            Xi[tag] = values_k[stage][:, tagi]
-            Yi = labels_k[stage]
-            xmin_selected = xmin[tagi : tagi + 1]
-            xmax_selected = xmax[tagi : tagi + 1]
-            print(f'{tagi + 1}/{len(features)} Training using tag {tag}')
-            nfeatures = 1
-            tags_selected = [tag]
-        elif args.evalmethod == 'not-selected':
-            Xtv, Ytv = {}, {}
-            for stage in stages[:-1]:
-                Xtv[stage], Ytv[stage] = {}, {}
+            # features
+
+            if args.evalmethod == 'selected':
+                Xtv, Ytv = {}, {}
+                for stage in stages[:-1]:
+                    Xtv[stage], Ytv[stage] = {}, {}
+                    Xtv[stage][tag] = values_k[stage][:, tagi]
+                    Ytv[stage][br_key] = labels_k[stage]
+                stage = stages[2]
+                Xi = {}
+                Xi[tag] = values_k[stage][:, tagi]
+                Yi = labels_k[stage]
+                xmin_selected = xmin[tagi: tagi + 1]
+                xmax_selected = xmax[tagi: tagi + 1]
+                print(f'{tagi + 1}/{len(features)} Training using tag {tag}')
+                nfeatures = 1
+                tags_selected = [tag]
+            elif args.evalmethod == 'not-selected':
+                Xtv, Ytv = {}, {}
+                for stage in stages[:-1]:
+                    Xtv[stage], Ytv[stage] = {}, {}
+                    for fi, f in enumerate(features):
+                        if classes[fi] <= args.delay and f != tag:
+                            Xtv[stage][f] = values_k[stage][:, fi]
+                    Ytv[stage][br_key] = labels_k[stage]
+                stage = stages[2]
+                Xi = {}
+                tags_selected, xmin_selected, xmax_selected = [], [], []
                 for fi, f in enumerate(features):
-                    if f != tag:
+                    if classes[fi] <= args.delay and f != tag:
+                        Xi[f] = values_k[stage][:, fi]
+                        tags_selected.append(f)
+                        xmin_selected.append(xmin[fi])
+                        xmax_selected.append(xmax[fi])
+                Yi = labels_k[stage]
+                nfeatures = []
+                for uc in uclasses:
+                    if classes[tagi] == uc:
+                        nfeatures.append(len(np.where(classes == uc)[0]) - 1)
+                    elif uc <= args.delay:
+                        nfeatures.append(len(np.where(classes == uc)[0]))
+                xmin_selected = np.array(xmin_selected)
+                xmax_selected = np.array(xmax_selected)
+                print(f'{tagi + 1}/{len(features)} Training using all but tag {tag}')
+            elif args.evalmethod == 'permuted':
+                Xtv, Ytv = {}, {}
+                for stage in stages[:-1]:
+                    Xtv[stage], Ytv[stage] = {}, {}
+                    for fi, f in enumerate(features):
                         Xtv[stage][f] = values_k[stage][:, fi]
-                Ytv[stage][br_key] = labels_k[stage]
-            stage = stages[2]
-            Xi = {}
-            for fi, f in enumerate(features):
-                if f != tag:
-                    Xi[f] = values_k[stage][:, fi]
-            Yi = labels_k[stage]
-            nfeatures = []
-            for uc in uclasses:
-                if classes[tagi] == uc:
-                    nfeatures.append(len(np.where(classes == uc)[0]) - 1)
-                else:
-                    nfeatures.append(len(np.where(classes == uc)[0]))
-            tags_selected = features.copy()
-            tags_selected.remove(tag)
-            xmin_selected = np.hstack([xmin[: tagi], xmin[tagi + 1 :]])
-            xmax_selected = np.hstack([xmax[: tagi], xmax[tagi + 1 :]])
-            print(f'{tagi + 1}/{len(features)} Training using all but tag {tag}')
-        elif args.evalmethod == 'permuted':
-            Xtv, Ytv = {}, {}
-            for stage in stages[:-1]:
-                Xtv[stage], Ytv[stage] = {}, {}
+                    Ytv[stage][br_key] = labels_k[stage]
+                stage = stages[2]
+                Xi = {}
                 for fi, f in enumerate(features):
-                    Xtv[stage][f] = values_k[stage][:, fi]
-                Ytv[stage][br_key] = labels_k[stage]
-            stage = stages[2]
-            Xi = {}
-            for fi, f in enumerate(features):
-                Xi[f] = values_k[stage][:, fi]
-            Yi = labels_k[stage]
-            nfeatures = []
-            for uc in uclasses:
-                nfeatures.append(len(np.where(classes == uc)[0]))
-            tags_selected = features.copy()
-            xmin_selected = xmin
-            xmax_selected = xmax
-            print(f'{tagi + 1}/{len(features)} Training using permuted tag {tag}')
+                    Xi[f] = values_k[stage][:, fi]
+                Yi = labels_k[stage]
+                nfeatures = []
+                for uc in uclasses:
+                    nfeatures.append(len(np.where(classes == uc)[0]))
+                tags_selected = features.copy()
+                xmin_selected = xmin
+                xmax_selected = xmax
+                print(f'{tagi + 1}/{len(features)} Training using permuted tag {tag}')
 
-            shuffle_idx_tr = np.arange(ntrain)
-            shuffle_idx_val = np.arange(nval)
-            np.random.shuffle(shuffle_idx_tr)
-            np.random.shuffle(shuffle_idx_val)
-            Xtv[stages[0]][tag] = Xtv[stages[0]][tag][shuffle_idx_tr]
-            Xtv[stages[1]][tag] = Xtv[stages[1]][tag][shuffle_idx_val]
+                shuffle_idx_tr = np.arange(ntrain)
+                shuffle_idx_val = np.arange(nval)
+                np.random.shuffle(shuffle_idx_tr)
+                np.random.shuffle(shuffle_idx_val)
+                Xtv[stages[0]][tag] = Xtv[stages[0]][tag][shuffle_idx_tr]
+                Xtv[stages[1]][tag] = Xtv[stages[1]][tag][shuffle_idx_val]
 
-        # create model
+            # create model
 
-        inputs, inputs_processed = model_input(tags_selected, xmin_selected, xmax_selected)
-        if args.evalmethod == 'selected':
-            hidden = inputs_processed
-            model_type = 'mlp'
-        else:
-            hidden = split(inputs_processed, nfeatures)
-            model_type = 'cnn1'
-        extractor_type = locals()[model_type]
-        hidden = extractor_type(hidden)
-        model = model_output(inputs, hidden, br_key, ymin, ymax)
+            inputs, inputs_processed = model_input(tags_selected, xmin_selected, xmax_selected)
+            if args.evalmethod == 'selected':
+                hidden = inputs_processed
+                model_type = 'mlp'
+            else:
+                hidden = split(inputs_processed, nfeatures)
+                model_type = 'cnn1'
+            extractor_type = locals()[model_type]
+            hidden = extractor_type(hidden)
+            model = model_output(inputs, hidden, br_key, ymin, ymax)
 
-        # create model and results directories
+            # create model and results directories
 
-        m_name = f'{model_type}_{args.evalmethod}_{tag}'
-        m_path = osp.join(model_mode_dir, m_name)
-        if not osp.isdir(m_path):
-            os.mkdir(m_path)
-        if args.verbose:
-            model.summary()
-
-        # load model
-
-        try:
-            model = tf.keras.models.load_model(m_path)
-
-        except Exception as e:
-            print(e)
+            m_name = f'{model_type}_{args.evalmethod}_{tag}'
+            m_path = osp.join(model_mode_dir, m_name)
+            if not osp.isdir(m_path):
+                os.mkdir(m_path)
+            if args.verbose:
+                model.summary()
 
             # train model
 
@@ -219,20 +216,16 @@ if __name__ == '__main__':
                 )]
             )
 
-            # save model
+            # predict and calculate inference statistics
 
-            model.save(m_path)
+            t_test = 0
+            predictions = model.predict(Xi)
+            predictions = predictions[br_key].flatten()
+            error = np.mean(np.abs(Yi - predictions))
 
-        # predict and calculate inference statistics
+            # save the results
 
-        t_test = 0
-        predictions = model.predict(Xi)
-        predictions = predictions[br_key].flatten()
-        error = np.mean(np.abs(Yi - predictions))
-
-        # save the results
-
-        print(f'Prediction error: {error}')
-        idx = np.where(p['Features'].values == tag)[0]
-        p[args.evalmethod].values[idx] = error
-        p.to_csv(r_path, index=None)
+            print(f'Prediction error: {error}')
+            idx = np.where(p['Features'].values == tag)[0]
+            p[args.evalmethod].values[idx] = error
+            p.to_csv(r_path, index=None)
