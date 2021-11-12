@@ -158,6 +158,7 @@ if __name__ == '__main__':
     predictions = model.predict(Xi)
     predictions = predictions[br_key].flatten()
     error_original = np.mean(np.abs(Yi - predictions))
+    print(error_original)
 
     # loop through features
 
