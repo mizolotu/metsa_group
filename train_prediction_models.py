@@ -28,7 +28,7 @@ if __name__ == '__main__':
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=modes)
     parser.add_argument('-u', '--update', help='Update results?', default=False, type=bool)
     parser.add_argument('-f', '--features', help='List of the features selected in json format',
-                        default=['permutation_important_spearman_cnn1_4.json', 'permutation_important_spearman_cnn1_5.json'])
+                        default=['permutation_important_all_cnn1_4.json', 'permutation_important_all_cnn1_5.json'])
     args = parser.parse_args()
 
     # create output directories
@@ -60,7 +60,7 @@ if __name__ == '__main__':
             try:
                 with open(osp.join(task_results_dir, fname)) as f:
                     feature_list.append(json.load(f))
-                    model_prefixes.append(f"{fname.split('.json')[0]}_")
+                    model_prefixes.append(f"{'_'.join(fname.split('.json')[0].split('_')[:3])}_")
             except:
                 feature_list.append(None)
                 model_prefixes.append('')
