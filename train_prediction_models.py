@@ -66,7 +66,7 @@ if __name__ == '__main__':
                 model_prefixes.append('')
     else:
         feature_list = [None for _ in args.classes]
-        model_prefixes.append('')
+        model_prefixes = ['' for _ in args.classes]
 
     # number of tests
 
