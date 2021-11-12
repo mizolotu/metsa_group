@@ -27,8 +27,8 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--ntests', help='Number of tests', type=int, default=3)
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=modes)
     parser.add_argument('-u', '--update', help='Update results?', default=False, type=bool)
-    parser.add_argument('-f', '--features', help='List of the features selected in json format',
-                        default=['permutation_important_spearman_cnn1_4.json', 'permutation_important_spearman_cnn1_5.json'])
+    parser.add_argument('-f', '--features', help='List of the features selected in json format')
+                        #default=['permutation_important_spearman_cnn1_4.json', 'permutation_important_spearman_cnn1_5.json'])
     args = parser.parse_args()
 
     # create output directories
