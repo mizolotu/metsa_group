@@ -17,15 +17,15 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-w', '--width', help='Figure width', type=float, default=21.2)
     parser.add_argument('-a', '--anonymize', help='Anonymize?', type=bool, default=False)
-    parser.add_argument('-c', '--correlation', help='Correlation', default='all')
+    parser.add_argument('-c', '--correlation', help='Correlation', nargs='+', default=['pearson', 'spearman'])
     args = parser.parse_args()
 
     # feature elimination metric
 
     if args.correlation is None:
-        elim = 'all'
+        elims = ['all']
     else:
-        elim = args.correlation
+        elims = args.correlation
 
     # directories and meta
 
@@ -71,15 +71,18 @@ if __name__ == '__main__':
 
     fname_list_all = [xy_correlation_csv]
     for c in np.unique(classes):
-        fname_list_all.append(permutation_importance_csv.format(elim, c))
+        for elim in elims:
+            fname_list_all.append(permutation_importance_csv.format(elim, c))
+        fname_list_all.append(prediction_importance_csv.format(c))
 
     fname_list = []
     for fname in fname_list_all:
-    #for fname in [xy_correlation_csv, prediction_importance_csv, permutation_importance_csv.format('all')]:
         if osp.isfile(osp.join(task_results_dir, fname)):
             fname_list.append(fname)
 
-    print(fname_list)
+    print('Files with stats:')
+    for fname in fname_list:
+        print(fname)
 
     # data
 

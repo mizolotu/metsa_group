@@ -289,7 +289,7 @@ if __name__ == '__main__':
 
             # save the results
 
-            print(f'Prediction error: {error}')
+            print(f'Prediction importance: {error}')
             idx = np.where(p['Features'].values == tag)[0]
             p[args.evalmethod].values[idx] = error
             p.to_csv(r_path, index=None)
