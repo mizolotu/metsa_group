@@ -96,19 +96,6 @@ if __name__ == '__main__':
     ymin = br_min
     ymax = br_max
 
-    # create baseline model
-
-    inputs, inputs_processed = model_input(features, xmin, xmax)
-    if args.evalmethod == 'selected':
-        hidden = inputs_processed
-        model_type = 'mlp'
-    else:
-        hidden = split(inputs_processed, nfeatures)
-        model_type = 'cnn1'
-    extractor_type = locals()[model_type]
-    hidden = extractor_type(hidden)
-    model = model_output(inputs, hidden, br_key, ymin, ymax)
-
     # data
 
     Xtv, Ytv = {}, {}
@@ -128,6 +115,25 @@ if __name__ == '__main__':
             xmin_selected.append(xmin[fi])
             xmax_selected.append(xmax[fi])
     Yi = labels_k[stage]
+    nfeatures = []
+    for uc in uclasses:
+        if uc <= args.delay:
+            nfeatures.append(len(np.where(classes == uc)[0]))
+    xmin_selected = np.array(xmin_selected)
+    xmax_selected = np.array(xmax_selected)
+
+    # create baseline model
+
+    inputs, inputs_processed = model_input(tags_selected, xmin_selected, xmax_selected)
+    if args.evalmethod == 'selected':
+        hidden = inputs_processed
+        model_type = 'mlp'
+    else:
+        hidden = split(inputs_processed, nfeatures)
+        model_type = 'cnn1'
+    extractor_type = locals()[model_type]
+    hidden = extractor_type(hidden)
+    model = model_output(inputs, hidden, br_key, ymin, ymax)
 
     # train model
 
