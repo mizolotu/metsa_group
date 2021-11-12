@@ -17,7 +17,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-w', '--width', help='Figure width', type=float, default=21.2)
     parser.add_argument('-a', '--anonymize', help='Anonymize?', type=bool, default=False)
-    parser.add_argument('-c', '--correlation', help='Correlation', default='pearson')
+    parser.add_argument('-c', '--correlation', help='Correlation', default='all')
     args = parser.parse_args()
 
     # feature elimination metric

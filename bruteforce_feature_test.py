@@ -91,6 +91,68 @@ if __name__ == '__main__':
     xmin = np.nanmin(values_k[stages[0]], axis=0)[:np.sum(nfeatures)]
     xmax = np.nanmax(values_k[stages[0]], axis=0)[:np.sum(nfeatures)]
 
+    # ymin and ymax
+
+    ymin = br_min
+    ymax = br_max
+
+    # create baseline model
+
+    inputs, inputs_processed = model_input(features, xmin, xmax)
+    if args.evalmethod == 'selected':
+        hidden = inputs_processed
+        model_type = 'mlp'
+    else:
+        hidden = split(inputs_processed, nfeatures)
+        model_type = 'cnn1'
+    extractor_type = locals()[model_type]
+    hidden = extractor_type(hidden)
+    model = model_output(inputs, hidden, br_key, ymin, ymax)
+
+    # data
+
+    Xtv, Ytv = {}, {}
+    for stage in stages[:-1]:
+        Xtv[stage], Ytv[stage] = {}, {}
+        for fi, f in enumerate(features):
+            if classes[fi] <= args.delay:
+                Xtv[stage][f] = values_k[stage][:, fi]
+        Ytv[stage][br_key] = labels_k[stage]
+    stage = stages[2]
+    Xi = {}
+    tags_selected, xmin_selected, xmax_selected = [], [], []
+    for fi, f in enumerate(features):
+        if classes[fi] <= args.delay:
+            Xi[f] = values_k[stage][:, fi]
+            tags_selected.append(f)
+            xmin_selected.append(xmin[fi])
+            xmax_selected.append(xmax[fi])
+    Yi = labels_k[stage]
+
+    # train model
+
+    model.fit(
+        Xtv[stages[0]], Ytv[stages[0]],
+        validation_data=(Xtv[stages[1]], Ytv[stages[1]]),
+        epochs=epochs,
+        verbose=args.verbose,
+        batch_size=batch_size,
+        callbacks=[tf.keras.callbacks.EarlyStopping(
+            monitor='val_loss',
+            verbose=0,
+            patience=patience,
+            mode='min',
+            restore_best_weights=True
+        )]
+    )
+
+    # predict and calculate inference statistics
+
+    t_test = 0
+    predictions = model.predict(Xi)
+    predictions = predictions[br_key].flatten()
+    error_original = np.mean(np.abs(Yi - predictions))
+
     # loop through features
 
     for tagi, tag in enumerate(features):
@@ -100,11 +162,6 @@ if __name__ == '__main__':
             # set seed
 
             set_seeds(args.seed)
-
-            # ymin and ymax
-
-            ymin = br_min
-            ymax = br_max
 
             # features
 
@@ -221,7 +278,7 @@ if __name__ == '__main__':
             t_test = 0
             predictions = model.predict(Xi)
             predictions = predictions[br_key].flatten()
-            error = np.mean(np.abs(Yi - predictions))
+            error = np.mean(np.abs(Yi - predictions)) / error_original
 
             # save the results
 
