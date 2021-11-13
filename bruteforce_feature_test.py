@@ -76,7 +76,7 @@ if __name__ == '__main__':
     ymax = br_max
 
     error_original = np.zeros(args.ntests)
-    timestamps_list, values_list, labels_list = [], [], []
+    timestamps_list, values_list, labels_list, xmin, xmax = [], [], [], [], []
     for k in range(args.ntests):
 
         # data split
@@ -101,8 +101,8 @@ if __name__ == '__main__':
 
         # standardization coefficients
 
-        xmin = np.nanmin(values_k[stages[0]], axis=0)[:np.sum(nfeatures)]
-        xmax = np.nanmax(values_k[stages[0]], axis=0)[:np.sum(nfeatures)]
+        xmin[k] = np.nanmin(values_k[stages[0]], axis=0)[:np.sum(nfeatures)]
+        xmax[k] = np.nanmax(values_k[stages[0]], axis=0)[:np.sum(nfeatures)]
 
         # data
 
@@ -120,8 +120,8 @@ if __name__ == '__main__':
             if classes[fi] <= args.delay:
                 Xi[f] = values_k[stage][:, fi]
                 tags_selected.append(f)
-                xmin_selected.append(xmin[fi])
-                xmax_selected.append(xmax[fi])
+                xmin_selected.append(xmin[k][fi])
+                xmax_selected.append(xmax[k][fi])
         Yi = labels_k[stage]
         nfeatures = []
         for uc in uclasses:
@@ -195,8 +195,8 @@ if __name__ == '__main__':
                     Xi = {}
                     Xi[tag] = values_list[k][stage][:, tagi]
                     Yi = labels_list[k][stage]
-                    xmin_selected = xmin[tagi: tagi + 1]
-                    xmax_selected = xmax[tagi: tagi + 1]
+                    xmin_selected = xmin[k][tagi: tagi + 1]
+                    xmax_selected = xmax[k][tagi: tagi + 1]
                     print(f'{tagi + 1}/{len(features)} Training using tag {tag}')
                     nfeatures = 1
                     tags_selected = [tag]
@@ -215,8 +215,8 @@ if __name__ == '__main__':
                         if classes[fi] <= args.delay and f != tag:
                             Xi[f] = values_list[k][stage][:, fi]
                             tags_selected.append(f)
-                            xmin_selected.append(xmin[fi])
-                            xmax_selected.append(xmax[fi])
+                            xmin_selected.append(xmin[k][fi])
+                            xmax_selected.append(xmax[k][fi])
                     Yi = labels_list[k][stage]
                     nfeatures = []
                     for uc in uclasses:
