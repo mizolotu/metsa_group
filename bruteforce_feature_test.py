@@ -101,8 +101,8 @@ if __name__ == '__main__':
 
         # standardization coefficients
 
-        xmin[k] = np.nanmin(values_k[stages[0]], axis=0)[:np.sum(nfeatures)]
-        xmax[k] = np.nanmax(values_k[stages[0]], axis=0)[:np.sum(nfeatures)]
+        xmin.append(np.nanmin(values_k[stages[0]], axis=0)[:np.sum(nfeatures)])
+        xmax.append(np.nanmax(values_k[stages[0]], axis=0)[:np.sum(nfeatures)])
 
         # data
 
