@@ -93,7 +93,7 @@ def aen(features, xmin, xmax, nfeatures, target, lr=5e-5):
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
     return model
 
-def model_output(inputs, hidden, target, ymin, ymax, nhidden=2048, dropout=0.5, lr=1e-7, eps=1e-8):
+def model_output(inputs, hidden, target, ymin, ymax, nhidden=2048, dropout=0.5, lr=1e-6, eps=1e-8):
     if dropout is not None:
         hidden = tf.keras.layers.Dropout(dropout)(hidden)
     hidden = tf.keras.layers.Dense(nhidden, activation='relu')(hidden)
