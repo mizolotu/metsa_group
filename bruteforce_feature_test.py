@@ -19,7 +19,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-g', '--gpu', help='GPU to use', default='0')
     parser.add_argument('-v', '--verbose', help='Verbose', default=False, type=bool)
-    parser.add_argument('-e', '--evalmethod', help='Evaluation method', choices=['selected', 'not-selected', 'permuted'], default='not-selected')
+    parser.add_argument('-e', '--evalmethod', help='Evaluation method', choices=['selected', 'not-selected', 'permuted'], default='permuted')
     parser.add_argument('-d', '--delay', help='Delay class', default=4, type=int)
     parser.add_argument('-n', '--ntests', help='Number of tests', default=3, type=int)
     args = parser.parse_args()
@@ -77,6 +77,8 @@ if __name__ == '__main__':
 
     error_original = np.zeros(args.ntests)
     timestamps_list, values_list, labels_list, xmin, xmax = [], [], [], [], []
+    tr_perm_idx, val_perm_idx = [], []
+
     for k in range(args.ntests):
 
         # data split
@@ -98,6 +100,17 @@ if __name__ == '__main__':
         labels_list.append(labels_k)
         ntrain = len(tr)
         nval = len(val)
+
+        # init permutations
+
+        shuffle_idx_tr = np.arange(ntrain)
+        shuffle_idx_val = np.arange(nval)
+        np.random.shuffle(shuffle_idx_tr)
+        np.random.shuffle(shuffle_idx_val)
+        np.random.shuffle(shuffle_idx_tr)
+        np.random.shuffle(shuffle_idx_val)
+        tr_perm_idx.append(shuffle_idx_tr.copy())
+        val_perm_idx.append(shuffle_idx_val.copy())
 
         # standardization coefficients
 
@@ -232,27 +245,28 @@ if __name__ == '__main__':
                     for stage in stages[:-1]:
                         Xtv[stage], Ytv[stage] = {}, {}
                         for fi, f in enumerate(features):
-                            Xtv[stage][f] = values_list[k][stage][:, fi]
+                            if classes[fi] <= args.delay:
+                                Xtv[stage][f] = values_list[k][stage][:, fi]
                         Ytv[stage][br_key] = labels_list[k][stage]
                     stage = stages[2]
                     Xi = {}
+                    tags_selected, xmin_selected, xmax_selected = [], [], []
                     for fi, f in enumerate(features):
-                        Xi[f] = values_list[k][stage][:, fi]
+                        if classes[fi] <= args.delay:
+                            Xi[f] = values_list[k][stage][:, fi]
+                            tags_selected.append(f)
+                            xmin_selected.append(xmin[k][fi])
+                            xmax_selected.append(xmax[k][fi])
                     Yi = labels_list[k][stage]
                     nfeatures = []
                     for uc in uclasses:
-                        nfeatures.append(len(np.where(classes == uc)[0]))
-                    tags_selected = features.copy()
-                    xmin_selected = xmin
-                    xmax_selected = xmax
+                        if uc <= args.delay:
+                            nfeatures.append(len(np.where(classes == uc)[0]))
+                    xmin_selected = np.array(xmin_selected)
+                    xmax_selected = np.array(xmax_selected)
                     print(f'{tagi + 1}/{len(features)} Training using permuted tag {tag}')
-
-                    shuffle_idx_tr = np.arange(ntrain)
-                    shuffle_idx_val = np.arange(nval)
-                    np.random.shuffle(shuffle_idx_tr)
-                    np.random.shuffle(shuffle_idx_val)
-                    Xtv[stages[0]][tag] = Xtv[stages[0]][tag][shuffle_idx_tr]
-                    Xtv[stages[1]][tag] = Xtv[stages[1]][tag][shuffle_idx_val]
+                    Xtv[stages[0]][tag] = Xtv[stages[0]][tag][tr_perm_idx[k]]
+                    Xtv[stages[1]][tag] = Xtv[stages[1]][tag][val_perm_idx[k]]
 
                 # create model
 
