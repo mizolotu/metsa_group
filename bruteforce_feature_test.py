@@ -83,7 +83,7 @@ if __name__ == '__main__':
 
         # set seed
 
-        set_seeds(args.seed)
+        set_seeds(args.seed + k)
 
         # data split
 
@@ -198,7 +198,7 @@ if __name__ == '__main__':
 
                 # set seed
 
-                set_seeds(args.seed)
+                set_seeds(args.seed + k)
 
                 # features
 
