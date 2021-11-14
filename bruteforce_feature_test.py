@@ -81,6 +81,10 @@ if __name__ == '__main__':
 
     for k in range(args.ntests):
 
+        # set seed
+
+        set_seeds(args.seed)
+
         # data split
 
         inds = np.arange(len(labels))
