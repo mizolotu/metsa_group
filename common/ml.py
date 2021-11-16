@@ -45,7 +45,7 @@ def split(hidden, nfeatures, latent_dim=256):
     return hidden
 
 def mlp(hidden, nhiddens=[2048, 2048], dropout=0.5):
-    hidden = tf.keras.layers.Flatten()(hidden)
+    #hidden = tf.keras.layers.Flatten()(hidden)
     for nhidden in nhiddens:
         hidden = tf.keras.layers.Dense(nhidden, activation='relu')(hidden)
         if dropout is not None:
