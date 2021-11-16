@@ -94,6 +94,7 @@ def aen(features, xmin, xmax, nfeatures, target, lr=5e-5):
     return model
 
 def model_output(inputs, hidden, target, ymin, ymax, nhidden=2048, dropout=0.5, lr=1e-6, eps=1e-8):
+    hidden = tf.keras.layers.Flatten()(hidden)
     if dropout is not None:
         hidden = tf.keras.layers.Dropout(dropout)(hidden)
     hidden = tf.keras.layers.Dense(nhidden, activation='relu')(hidden)
