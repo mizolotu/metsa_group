@@ -20,22 +20,32 @@ def init():
 
 def run(data):
     try:
-        sample = json.loads(data)
-        model, dc = model_selector(sample)
-        if model is not None:
-            sample = adjust_input(sample, model)
-            result = model.predict(sample)
-            key = [key for key in result.keys()][0]
-            value = result[key][0, 0].tolist()
-            result = {key: value, 'model': dc, 'status': 'ok'}
+        samples = json.loads(data)
+        if type(samples) != list:
+            samples = [samples]
+        if len(samples) > 0:
+            results = []
+            status = 'ok'
+            for sample in samples:
+                try:
+                    model, dc = model_selector(sample)
+                    if model is not None:
+                        sample = adjust_input(sample, model)
+                        result = model.predict(sample)
+                        key = [key for key in result.keys()][0]
+                        value = result[key][0, 0].tolist()
+                        results.append({key: value, 'model': dc})
+                except:
+                    results.append({})
+                    status = 'error'
+            resp = {'result': results, 'status': status}
         else:
-            result = {'status': 'no input data provided'}
+            resp = {'status': 'no input data provided', 'result': []}
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        print(e, fname, exc_tb.tb_lineno)
-        result = {'status': 'error'}
-    return result
+        resp = {'status': f'exception {e} in {fname} at line {exc_tb.tb_lineno}', 'result': []}
+    return resp
 
 def adjust_input(data, model):
     for key in model.input:
