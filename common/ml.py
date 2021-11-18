@@ -31,7 +31,7 @@ def model_input(features, xmin, xmax, steps=1, eps=1e-10):
     hidden = (inputs_without_nan - xmin) / (xmax - xmin + eps)
     return inputs, hidden
 
-def split(hidden, nfeatures, latent_dim=256, batchnorm=True, gn_std=0.001, dropout=0.5):
+def split(hidden, nfeatures, latent_dim=256, batchnorm=True, gn_std=0.01, dropout=0.5):
     if batchnorm:
         hidden = tf.keras.layers.BatchNormalization()(hidden)
     if gn_std is not None:
