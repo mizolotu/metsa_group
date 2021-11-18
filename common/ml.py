@@ -7,7 +7,7 @@ from sklearn.metrics import roc_auc_score
 def roc_auc(labels, preds, fpr=1):
     return roc_auc_score(labels, preds, max_fpr=fpr)
 
-def model_input(features, xmin, xmax, steps=1, batchnorm=True, gn_std=0.01, eps=1e-10):
+def model_input(features, xmin, xmax, steps=1, batchnorm=True, gn_std=0.05, eps=1e-10):
 
     # input layer
 
