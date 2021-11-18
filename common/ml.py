@@ -7,7 +7,7 @@ from sklearn.metrics import roc_auc_score
 def roc_auc(labels, preds, fpr=1):
     return roc_auc_score(labels, preds, max_fpr=fpr)
 
-def model_input(features, xmin, xmax, steps=1, batchnorm=True, gn_std=0.05, eps=1e-10):
+def model_input(features, xmin, xmax, steps=1, batchnorm=True, gn_std=0.01, eps=1e-10):
 
     # input layer
 
@@ -37,7 +37,7 @@ def model_input(features, xmin, xmax, steps=1, batchnorm=True, gn_std=0.05, eps=
         hidden = tf.keras.layers.GaussianNoise(stddev=gn_std)(hidden)
     return inputs, hidden
 
-def split(hidden, nfeatures, latent_dim=256, dropout=0.5):
+def split(hidden, nfeatures, latent_dim=256, batchnorm=True, gn_std=0.01, dropout=0.5):
     hidden_spl = tf.split(hidden, nfeatures, axis=-1)
     hidden = []
     for spl in hidden_spl:
@@ -49,6 +49,10 @@ def split(hidden, nfeatures, latent_dim=256, dropout=0.5):
             )(spl)
         )
     hidden = tf.stack(hidden, axis=-2)
+    if batchnorm:
+        hidden = tf.keras.layers.BatchNormalization()(hidden)
+    if gn_std is not None:
+        hidden = tf.keras.layers.GaussianNoise(stddev=gn_std)(hidden)
     if dropout is not None:
         hidden = tf.keras.layers.Dropout(dropout)(hidden)
     return hidden
@@ -61,9 +65,13 @@ def mlp(hidden, nhiddens=[2048, 2048], dropout=0.5):
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
     return hidden
 
-def cnn1(hidden, nhiddens=[512, 1024], nfilters=1024, kernel_size=2, dropout=0.5):
+def cnn1(hidden, nhiddens=[512, 1024], nfilters=1024, kernel_size=2, batchnorm=True, gn_std=0.01, dropout=0.5):
     last_conv_kernel_size = hidden.shape[-2]
     for nhidden in nhiddens:
+        if batchnorm:
+            hidden = tf.keras.layers.BatchNormalization()(hidden)
+        if gn_std is not None:
+            hidden = tf.keras.layers.GaussianNoise(stddev=gn_std)(hidden)
         hidden = tf.keras.layers.Conv1D(
             nhidden, kernel_size, padding='same', activation='relu',
             kernel_regularizer = tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4),
@@ -108,14 +116,18 @@ def aen(features, xmin, xmax, nfeatures, target, lr=5e-5):
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
     return model
 
-def model_output(inputs, hidden, target, ymin, ymax, nhidden=2048, dropout=0.5, lr=5e-5, eps=1e-8):
-    if dropout is not None:
-        hidden = tf.keras.layers.Dropout(dropout)(hidden)
+def model_output(inputs, hidden, target, ymin, ymax, nhidden=2048, dropout=0.5, batchnorm=True, gn_std=0.01, lr=5e-5, eps=1e-8):
+    if batchnorm:
+        hidden = tf.keras.layers.BatchNormalization()(hidden)
+    if gn_std is not None:
+        hidden = tf.keras.layers.GaussianNoise(stddev=gn_std)(hidden)
     hidden = tf.keras.layers.Dense(
         nhidden, activation='relu',
         kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4),
         bias_regularizer=tf.keras.regularizers.l2(1e-4)
     )(hidden)
+    if dropout is not None:
+        hidden = tf.keras.layers.Dropout(dropout)(hidden)
     outputs = tf.keras.layers.Dense(1, activation='linear')(hidden)
     outputs = outputs * (ymax - ymin) + ymin
     outputs = {target: outputs}
