@@ -7,7 +7,7 @@ from sklearn.metrics import roc_auc_score
 def roc_auc(labels, preds, fpr=1):
     return roc_auc_score(labels, preds, max_fpr=fpr)
 
-def model_input(features, xmin, xmax, steps=1, batchnorm=True, gn_std=0.01, eps=1e-10):
+def model_input(features, xmin, xmax, steps=1, eps=1e-10):
 
     # input layer
 
@@ -28,16 +28,14 @@ def model_input(features, xmin, xmax, steps=1, batchnorm=True, gn_std=0.01, eps=
 
     # standardize the input
 
-    inputs_std = (inputs_without_nan - xmin) / (xmax - xmin + eps)
-    if batchnorm:
-        hidden = tf.keras.layers.BatchNormalization()(inputs_std)
-    else:
-        hidden = inputs_std
-    if gn_std is not None:
-        hidden = tf.keras.layers.GaussianNoise(stddev=gn_std)(hidden)
+    hidden = (inputs_without_nan - xmin) / (xmax - xmin + eps)
     return inputs, hidden
 
 def split(hidden, nfeatures, latent_dim=256, batchnorm=True, gn_std=0.01, dropout=0.5):
+    if batchnorm:
+        hidden = tf.keras.layers.BatchNormalization()(hidden)
+    if gn_std is not None:
+        hidden = tf.keras.layers.GaussianNoise(stddev=gn_std)(hidden)
     hidden_spl = tf.split(hidden, nfeatures, axis=-1)
     hidden = []
     for spl in hidden_spl:
@@ -49,10 +47,6 @@ def split(hidden, nfeatures, latent_dim=256, batchnorm=True, gn_std=0.01, dropou
             )(spl)
         )
     hidden = tf.stack(hidden, axis=-2)
-    if batchnorm:
-        hidden = tf.keras.layers.BatchNormalization()(hidden)
-    if gn_std is not None:
-        hidden = tf.keras.layers.GaussianNoise(stddev=gn_std)(hidden)
     if dropout is not None:
         hidden = tf.keras.layers.Dropout(dropout)(hidden)
     return hidden
