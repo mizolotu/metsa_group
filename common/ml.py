@@ -85,16 +85,43 @@ def cnn1(hidden, nhiddens=[512, 1024], nfilters=1024, kernel_size=2, batchnorm=N
     hidden = tf.keras.layers.Flatten()(hidden)
     return hidden
 
-def lstm(hidden, nhidden=640):
-    hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
-    hidden = tf.keras.layers.LSTM(nhidden, return_sequences=True)(hidden)
-    hidden = tf.keras.layers.LSTM(nhidden)(hidden)
+def lstm(hidden, nhidden=640, batchnorm=None, gn_std=0.01, dropout=0.5):
+    if batchnorm:
+        hidden = tf.keras.layers.BatchNormalization()(hidden)
+    if gn_std is not None:
+        hidden = tf.keras.layers.GaussianNoise(stddev=gn_std)(hidden)
+    hidden = tf.keras.layers.LSTM(
+        nhidden, return_sequences=True,
+        kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4),
+        bias_regularizer=tf.keras.regularizers.l2(1e-4)
+    )(hidden)
+    if dropout is not None:
+        hidden = tf.keras.layers.Dropout(dropout)(hidden)
+    if batchnorm:
+        hidden = tf.keras.layers.BatchNormalization()(hidden)
+    if gn_std is not None:
+        hidden = tf.keras.layers.GaussianNoise(stddev=gn_std)(hidden)
+    hidden = tf.keras.layers.LSTM(
+        nhidden,
+        kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4),
+        bias_regularizer=tf.keras.regularizers.l2(1e-4)
+    )(hidden)
+    if dropout is not None:
+        hidden = tf.keras.layers.Dropout(dropout)(hidden)
     return hidden
 
-def bilstm(hidden, nhidden=640):
-    hidden = tf.keras.layers.Masking(mask_value=nan_value)(hidden)
-    hidden = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(nhidden, activation='relu', return_sequences=False))(hidden)
-    hidden = tf.keras.layers.Flatten()(hidden)
+def bilstm(hidden, nhidden=640, batchnorm=None, gn_std=0.01, dropout=0.5):
+    if batchnorm:
+        hidden = tf.keras.layers.BatchNormalization()(hidden)
+    if gn_std is not None:
+        hidden = tf.keras.layers.GaussianNoise(stddev=gn_std)(hidden)
+    hidden = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
+        nhidden, activation='relu', return_sequences=False),
+        kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4),
+        bias_regularizer=tf.keras.regularizers.l2(1e-4)
+    )(hidden)
+    if dropout is not None:
+        hidden = tf.keras.layers.Dropout(dropout)(hidden)
     return hidden
 
 def cnn1lstm(hidden, nfilters=[1280, 1280], kernel_size=2, nhidden=640, batchnorm=None, gn_std=0.01, dropout=0.5):

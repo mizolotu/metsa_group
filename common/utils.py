@@ -46,8 +46,8 @@ def create_table_pointer(table, meta, timestamp_column, other_columns):
     table_pointer = sqlalchemy.Table(
         table,
         meta,
-        sqlalchemy.Column(timestamp_column, sqlalchemy.String),
-        *[sqlalchemy.Column(column, sqlalchemy.Float) for column in other_columns]
+        sqlalchemy.Column(timestamp_column, sqlalchemy.DateTime),
+        *[sqlalchemy.Column(column, sqlalchemy.String) for column in other_columns]
     )
     meta.create_all(checkfirst=True)
     return table_pointer
