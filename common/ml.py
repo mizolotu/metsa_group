@@ -110,7 +110,7 @@ def aen(features, xmin, xmax, nfeatures, target, lr=5e-5):
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
     return model
 
-def model_output(inputs, hidden, target, ymin, ymax, layers=[2048, 2048], dropout=0.5, batchnorm=True, gn_std=None, lr=1e-6, eps=1e-8):
+def model_output(inputs, hidden, target, ymin, ymax, layers=[2048, 2048], dropout=0.5, batchnorm=True, gn_std=None, lr=5e-5, eps=1e-8):
     for nhidden in layers:
         if batchnorm:
             hidden = tf.keras.layers.BatchNormalization()(hidden)
