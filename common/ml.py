@@ -31,7 +31,7 @@ def model_input(features, xmin, xmax, steps=1, eps=1e-10):
     hidden = (inputs_without_nan - xmin) / (xmax - xmin + eps)
     return inputs, hidden
 
-def split(hidden, nfeatures, latent_dim=256, batchnorm=True, gn_std=0.01, dropout=0.5):
+def split(hidden, nfeatures, latent_dim=256, batchnorm=True, gn_std=0.001, dropout=0.5):
     if batchnorm:
         hidden = tf.keras.layers.BatchNormalization()(hidden)
     if gn_std is not None:
@@ -59,7 +59,7 @@ def mlp(hidden, nhiddens=[2048, 2048], dropout=0.5):
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
     return hidden
 
-def cnn1(hidden, nhiddens=[512, 1024], nfilters=1024, kernel_size=2, batchnorm=True, gn_std=0.01, dropout=0.5):
+def cnn1(hidden, nhiddens=[512, 1024], nfilters=1024, kernel_size=2, batchnorm=True, gn_std=0.001, dropout=0.5):
     last_conv_kernel_size = hidden.shape[-2]
     for nhidden in nhiddens:
         if batchnorm:
@@ -110,7 +110,7 @@ def aen(features, xmin, xmax, nfeatures, target, lr=5e-5):
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
     return model
 
-def model_output(inputs, hidden, target, ymin, ymax, layers=[2048, 2048], dropout=0.5, batchnorm=True, gn_std=0.01, lr=1e-6, eps=1e-8):
+def model_output(inputs, hidden, target, ymin, ymax, layers=[2048, 2048], dropout=0.5, batchnorm=True, gn_std=0.001, lr=1e-6, eps=1e-8):
     for nhidden in layers:
         if batchnorm:
             hidden = tf.keras.layers.BatchNormalization()(hidden)
