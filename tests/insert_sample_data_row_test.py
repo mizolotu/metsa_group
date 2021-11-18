@@ -16,7 +16,7 @@ if __name__ == '__main__':
     driver = '{ODBC Driver 17 for SQL Server}'
     table = 'metsa_brp_sample_data'
     username = 'jyusqlserver'
-    password = ''
+    password = '#jyusql1'
 
     db_connection_str = f'DRIVER={driver};SERVER={server};PORT=1433;DATABASE={database};UID={username};PWD={password}'
     params = urllib.parse.quote_plus(db_connection_str)
@@ -48,9 +48,14 @@ if __name__ == '__main__':
 
     # inserting
 
+    idx = None
+
     while True:
 
-        idx = np.random.randint(n)
+        if idx is None:
+            idx = np.random.randint(n)
+        else:
+            idx += 1
 
         current_time = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f") + '0'  # sql has 7 digits precision for some reason
         X, y = features[idx, :], labels[idx]
@@ -58,9 +63,9 @@ if __name__ == '__main__':
         sample = {}
         for f, x in zip(datameta['features'], X):
             if not np.isnan(x):
-                sample[f] = x
+                sample[f] = str(x)
         sample[ts_key] = current_time
-        sample[br_key] = y
+        sample[br_key] = str(y)
 
         insert_data_row(table_pointer, db_connection, sample)
 
