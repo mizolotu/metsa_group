@@ -48,6 +48,11 @@ if __name__ == '__main__':
                 else:
                     keys = [key for key in p.keys() if key != ts_key]
                 values.append(p[keys].values)
+                fname_new = f"{p[ts_key].values[-1].split('.')[0]}-{p[ts_key].values[0].split('.')[0]}{csv}"
+                fname_new = fname_new.replace(':', '')
+                p.to_csv(osp.join(raw_data_dir, fname_new), index=False)
+                if fname != fname_new:
+                    os.remove(osp.join(raw_data_dir, fname))
             except Exception as e:
                 print(e)
     if len(values) > 0:

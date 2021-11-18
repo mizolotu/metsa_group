@@ -18,17 +18,16 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Train prediction models')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
     parser.add_argument('-e', '--extractor', help='Feature extractor', default='cnn1', choices=['mlp', 'cnn1', 'lstm', 'bilstm', 'cnn1lstm', 'aen', 'som'])
-    parser.add_argument('-c', '--classes', help='Delay class when prediction starts', type=int, nargs='+', default=[1, 2, 3, 4, 5])
-    parser.add_argument('-s', '--seed', help='Seed', type=int, default=seed)
+    parser.add_argument('-c', '--classes', help='Delay class when prediction starts', type=int, nargs='+', default=[4, 5])
+    parser.add_argument('-s', '--seed', help='Starting seed', type=int, default=seed)
     parser.add_argument('-g', '--gpu', help='GPU to use', default='0')
     parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
     parser.add_argument('-y', '--ylimits', help='Use bleach ratio limits from data?', default=False, type=bool)
     parser.add_argument('-r', '--retrain', help='Retrain model?', default=False, type=bool)
-    parser.add_argument('-n', '--ntests', help='Number of tests', type=int, default=1)
-    parser.add_argument('-m', '--mode', help='Mode', default='production', choices=modes)
+    parser.add_argument('-n', '--ntests', help='Number of tests', type=int, default=3)
+    parser.add_argument('-m', '--mode', help='Mode', default='development', choices=modes)
     parser.add_argument('-u', '--update', help='Update results?', default=True, type=bool)
     parser.add_argument('-f', '--features', help='List of the features selected in json format')
-                        #default=['permutation_important_spearman_cnn1_4.json', 'permutation_important_spearman_cnn1_5.json'])
     args = parser.parse_args()
 
     # create output directories
@@ -85,10 +84,6 @@ if __name__ == '__main__':
     # walk through classes
 
     for delay_class, features, model_prefix in zip(args.classes, feature_list, model_prefixes):
-
-        # set seed for results reproduction
-
-        set_seeds(args.seed)
 
         # load meta
 
@@ -161,6 +156,10 @@ if __name__ == '__main__':
 
         for k in range(ntests):
             print(f'Test {k + 1}/{ntests}:')
+
+            # set seed for results reproduction
+
+            set_seeds(args.seed + k)
 
             # data split
 
