@@ -116,10 +116,10 @@ def bilstm(hidden, nhidden=640, batchnorm=None, gn_std=0.01, dropout=0.5):
     if gn_std is not None:
         hidden = tf.keras.layers.GaussianNoise(stddev=gn_std)(hidden)
     hidden = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
-        nhidden, activation='relu', return_sequences=False),
+        nhidden, activation='relu', return_sequences=False,
         kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4),
         bias_regularizer=tf.keras.regularizers.l2(1e-4)
-    )(hidden)
+    ))(hidden)
     if dropout is not None:
         hidden = tf.keras.layers.Dropout(dropout)(hidden)
     return hidden
