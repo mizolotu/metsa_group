@@ -110,18 +110,19 @@ def aen(features, xmin, xmax, nfeatures, target, lr=5e-5):
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
     return model
 
-def model_output(inputs, hidden, target, ymin, ymax, nhidden=2048, dropout=0.5, batchnorm=True, gn_std=0.01, lr=5e-5, eps=1e-8):
-    if batchnorm:
-        hidden = tf.keras.layers.BatchNormalization()(hidden)
-    if gn_std is not None:
-        hidden = tf.keras.layers.GaussianNoise(stddev=gn_std)(hidden)
-    hidden = tf.keras.layers.Dense(
-        nhidden, activation='relu',
-        kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4),
-        bias_regularizer=tf.keras.regularizers.l2(1e-4)
-    )(hidden)
-    if dropout is not None:
-        hidden = tf.keras.layers.Dropout(dropout)(hidden)
+def model_output(inputs, hidden, target, ymin, ymax, layers=[2048, 2048], dropout=0.5, batchnorm=True, gn_std=0.01, lr=1e-6, eps=1e-8):
+    for nhidden in layers:
+        if batchnorm:
+            hidden = tf.keras.layers.BatchNormalization()(hidden)
+        if gn_std is not None:
+            hidden = tf.keras.layers.GaussianNoise(stddev=gn_std)(hidden)
+        hidden = tf.keras.layers.Dense(
+            nhidden, activation='relu',
+            kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4),
+            bias_regularizer=tf.keras.regularizers.l2(1e-4)
+        )(hidden)
+        if dropout is not None:
+            hidden = tf.keras.layers.Dropout(dropout)(hidden)
     outputs = tf.keras.layers.Dense(1, activation='linear')(hidden)
     outputs = outputs * (ymax - ymin) + ymin
     outputs = {target: outputs}
