@@ -24,7 +24,7 @@ if __name__ == '__main__':
     parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
     parser.add_argument('-y', '--ylimits', help='Use bleach ratio limits from data?', default=False, type=bool)
     parser.add_argument('-r', '--retrain', help='Retrain model?', default=False, type=bool)
-    parser.add_argument('-n', '--ntests', help='Number of tests', type=int, default=3)
+    parser.add_argument('-n', '--ntests', help='Number of tests', type=int, default=5)
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=modes)
     parser.add_argument('-u', '--update', help='Update results?', default=True, type=bool)
     parser.add_argument('-f', '--features', help='Comma separated tuples: <csv file with feature importance values>,<column index>,<number of features>', nargs='+')
