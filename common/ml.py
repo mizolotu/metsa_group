@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
-from config import nan_value, threshold_variable_name
+from config import nan_value
 from sklearn.metrics import roc_auc_score
 
 def roc_auc(labels, preds, fpr=1):

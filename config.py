@@ -28,10 +28,7 @@ anomaly_detection_results_fname = 'anomaly_detection_results.csv'
 anomaly_detection_mean_aucs_fname = 'anomaly_detection_mean_aucs.csv'
 
 summary_txt = 'summary.txt'
-example_samples_fname = 'example.json'
-test_samples_fname = 'test_samples.csv'
-error_cdf_fname = 'error_cdf.pdf'
-error_for_real_fname = 'error_for_real.pdf'
+test_samples_fname = '2021-11-14T032858-2021-11-18T063225.csv'
 
 # data
 
@@ -56,13 +53,8 @@ batch_size = 64
 epochs = 10000
 patience = 200
 series_len = 64
-threshold_variable_name = 'threshold'
-ae_models = ['aen', 'som']
-
-# azure
-
-endpoint_jyu = 'http://20.93.236.203/api/v1/service/metsa-brp/score'
-insert_data_sample_function_url = 'http://localhost:7071/api/insert_sample_data_row'
+default_feature_extractor = 'mlp'
+default_feature_extractor_name = 'baseline'
 
 # other
 

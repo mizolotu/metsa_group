@@ -9,7 +9,7 @@ import argparse as arp
 
 from config import *
 from common.utils import set_seeds, load_meta, load_data, pad_data
-from common.ml import model_input, split, model_output, mlp, cnn1, lstm, bilstm, cnn1lstm, aen, som, EarlyStoppingAtMaxAUC, roc_auc
+from common.ml import model_input, split, model_output, mlp, cnn1, lstm, bilstm, cnn1lstm, EarlyStoppingAtMaxAUC, roc_auc
 
 if __name__ == '__main__':
 
@@ -17,7 +17,7 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train prediction models')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-e', '--extractor', help='Feature extractor', default='cnn1', choices=['mlp', 'cnn1', 'lstm', 'bilstm', 'cnn1lstm', 'aen', 'som'])
+    parser.add_argument('-e', '--extractor', help='Feature extractor', choices=['mlp', 'cnn1', 'cnn1lstm', 'lstm', 'bilstm'])
     parser.add_argument('-c', '--classes', help='Delay class when prediction starts', type=int, nargs='+', default=[4, 5])
     parser.add_argument('-s', '--seed', help='Starting seed', type=int, default=seed)
     parser.add_argument('-g', '--gpu', help='GPU to use', default='0')
@@ -27,7 +27,7 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--ntests', help='Number of tests', type=int, default=3)
     parser.add_argument('-m', '--mode', help='Mode', default='development', choices=modes)
     parser.add_argument('-u', '--update', help='Update results?', default=True, type=bool)
-    parser.add_argument('-f', '--features', help='List of the features selected in json format')
+    parser.add_argument('-f', '--features', help='Comma separated tuples: <csv file with feature importance values>,<column index>,<number of features>', nargs='+')
     args = parser.parse_args()
 
     # create output directories
@@ -44,22 +44,22 @@ if __name__ == '__main__':
     # model input layer
 
     feature_extractor = args.extractor
-    if feature_extractor in ae_models:
-        ae = True
-    else:
-        ae = False
 
     # feature indexes
 
-    model_prefixes = []
     if args.features is not None:
-        assert len(args.features) == len(args.classes), 'There should be file with feature indexes for every delay class tested'
-        feature_list = []
-        for fname in args.features:
+        assert len(args.features) == len(args.classes)
+        feature_list, model_prefixes = [], []
+        for features in args.features:
             try:
-                with open(osp.join(task_results_dir, fname)) as f:
-                    feature_list.append(json.load(f))
-                    model_prefixes.append(f"{'_'.join(fname.split('.json')[0].split('_')[:3])}_")
+                fname, col, nfs = features[0], int(features[1]), int(features[2])
+                df = pd.read_csv(osp.join(task_results_dir, fname))
+                keys = list(df.keys())
+                col_header = keys[col]
+                f_importance = df[col_header].values
+                idx = np.argsort(f_importance)[::-1][:nfs]
+                feature_list.append(df['Features'][idx].tolist())
+                model_prefixes.append(f"{'_'.join(fname.split('.json')[0].split('_')[:2])}_{col_header}_{nfs}")
             except:
                 feature_list.append(None)
                 model_prefixes.append('')
@@ -123,7 +123,7 @@ if __name__ == '__main__':
 
         # model name
 
-        model_type = f'{model_prefix}{feature_extractor}'
+        model_type = f'{model_prefix}{feature_extractor if feature_extractor is not None else default_feature_extractor_name}'
         model_name = f'{model_type}_{delay_class}'
 
         # create model directory
@@ -168,15 +168,7 @@ if __name__ == '__main__':
             np.random.shuffle(inds)
             val, remaining = np.split(inds, [int(validation_share * len(inds))])
             tr, te = np.split(remaining, [int(train_test_ratio * len(remaining))])
-            if ae:
-                labels_ = np.zeros_like(labels)
-                labels_[np.where((labels < br_min) | (labels > br_max))[0]] = 1
-                outlier_ids = tr[np.where(labels[tr] == 1)[0]]
-                val = np.append(val, outlier_ids)
-                te = np.append(te, outlier_ids)
-                tr = tr[np.where(labels_[tr] == 0)[0]]
-            else:
-                labels_ = labels.copy()
+            labels_ = labels.copy()
             if args.mode == 'production':
                 tr = np.hstack([tr, val])
                 val = te.copy()
@@ -242,9 +234,11 @@ if __name__ == '__main__':
 
                 print(f'Training new model {model_name}:')
 
-                if ae:
-                    extractor_type = locals()[feature_extractor]
-                    model = extractor_type(features_selected, xmin, xmax, nfeatures, br_key)
+                if feature_extractor is None:
+                    inputs, hidden = model_input(features_selected, xmin, xmax, steps)
+                    extractor_type = locals()[default_feature_extractor]
+                    hidden = extractor_type(hidden)
+                    model = model_output(inputs, hidden, br_key, ymin, ymax)
                 else:
                     inputs, inputs_processed = model_input(features_selected, xmin, xmax, steps)
                     hidden = split(inputs_processed, nfeatures)
@@ -257,12 +251,7 @@ if __name__ == '__main__':
                 if args.verbose and k == 0:
                     print(model_summary)
 
-                if ae:
-                    x_val = np.hstack([np.expand_dims(Xtv[stages[1]][f], 1) for f in features_selected])
-                    y_val = Ytv[stages[1]][br_key]
-                    es_callback = EarlyStoppingAtMaxAUC(validation_data=(Xtv[stages[1]], Ytv[stages[1]]), patience=patience)
-                else:
-                    es_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=patience, mode='min', restore_best_weights=True)
+                es_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=patience, mode='min', restore_best_weights=True)
 
                 model.fit(
                     Xtv[stages[0]], Ytv[stages[0]],
@@ -283,129 +272,79 @@ if __name__ == '__main__':
             # calculate prediction error for non-permuted features of the class combination
 
             predictions = model.predict(Xi)
+            predictions = predictions[br_key].flatten()
+            min_errors[k] = np.min(np.abs(Yi - predictions))
+            mean_errors[k] = np.mean(np.abs(Yi - predictions))
+            max_errors[k] = np.max(np.abs(Yi - predictions))
+            max_i = np.argmax(np.abs(Yi - predictions))
+            print(f'Max error prediction: {predictions[max_i]}, the real value: {Yi[max_i]}')
 
-            if ae:
+            errors.extend(np.abs(Yi - predictions))
+            reals.extend(Yi)
+            tsteps.extend(Ti)
+            preds.extend(predictions)
 
-                aucs[k] = roc_auc(Yi, predictions)
-                reals.extend(Yi)
-                tsteps.extend(Ti)
-                preds.extend(predictions)
-
-                print(f'Anomaly detection ROC AUC (FPR = 10%): {roc_auc(Yi, predictions, fpr=0.1)}')
-                print(f'Anomaly detection ROC AUC (FPR = 1%): {roc_auc(Yi, predictions, fpr=0.01)}')
-                print(f'Anomaly detection ROC AUC (FPR = 0.1%): {roc_auc(Yi, predictions, fpr=0.001)}')
-
-            else:
-
-                predictions = predictions[br_key].flatten()
-                min_errors[k] = np.min(np.abs(Yi - predictions))
-                mean_errors[k] = np.mean(np.abs(Yi - predictions))
-                max_errors[k] = np.max(np.abs(Yi - predictions))
-                max_i = np.argmax(np.abs(Yi - predictions))
-                print(f'Max error prediction: {predictions[max_i]}, the real value: {Yi[max_i]}')
-
-                errors.extend(np.abs(Yi - predictions))
-                reals.extend(Yi)
-                tsteps.extend(Ti)
-                preds.extend(predictions)
-
-                print(f'Mean absolute prediction error for combination {model_dc_comb}: {mean_errors[k]}')
-                print(f'Min absolute prediction error for combination {model_dc_comb}: {min_errors[k]}')
-                print(f'Max absolute prediction error for combination {model_dc_comb}: {max_errors[k]}')
+            print(f'Mean absolute prediction error for combination {model_dc_comb}: {mean_errors[k]}')
 
         # results tables
 
-        if ae:
+        mean_e_path = osp.join(results_mode_dir, prediction_mean_errors_fname)
+        min_e_path = osp.join(results_mode_dir, prediction_min_errors_fname)
+        max_e_path = osp.join(results_mode_dir, prediction_max_errors_fname)
+        r_path = osp.join(results_mode_dir, prediction_results_fname)
 
-            mean_a_path = osp.join(results_mode_dir, anomaly_detection_mean_aucs_fname)
-            r_path = osp.join(results_mode_dir, anomaly_detection_results_fname)
+        try:
+            p_e_mean = pd.read_csv(mean_e_path)
+        except Exception:
+            p_e_mean = pd.DataFrame({
+                dc_combs_col_name: [comb for comb in tbl_dc_combs]
+            })
 
-            try:
-                auc_mean = pd.read_csv(mean_a_path)
-            except:
-                auc_mean = pd.DataFrame({
-                    dc_combs_col_name: [comb for comb in tbl_dc_combs]
-                })
+        if model_type not in p_e_mean.keys():
+            p_e_mean[model_type] = [np.nan for comb in tbl_dc_combs]
 
-            if model_type not in auc_mean.keys():
-                auc_mean[model_type] = [np.nan for comb in tbl_dc_combs]
+        try:
+            p_e_min = pd.read_csv(min_e_path)
+        except:
+            p_e_min = pd.DataFrame({
+                dc_combs_col_name: [comb for comb in tbl_dc_combs]
+            })
 
-            try:
-                pr = pd.read_csv(r_path)
-                assert pr.shape[0] == len(tsteps), 'The dataset size has changed, the statistics table will be rewritten!'
-            except:
-                pr = pd.DataFrame({
-                    ts_key: [value for value in tsteps],
-                    br_key: [value for value in reals],
-                })
+        if model_type not in p_e_min.keys():
+            p_e_min[model_type] = [np.nan for comb in tbl_dc_combs]
 
-        else:
+        try:
+            p_e_max = pd.read_csv(max_e_path)
+        except:
+            p_e_max = pd.DataFrame({
+                dc_combs_col_name: [comb for comb in tbl_dc_combs]
+            })
 
-            mean_e_path = osp.join(results_mode_dir, prediction_mean_errors_fname)
-            min_e_path = osp.join(results_mode_dir, prediction_min_errors_fname)
-            max_e_path = osp.join(results_mode_dir, prediction_max_errors_fname)
-            r_path = osp.join(results_mode_dir, prediction_results_fname)
+        if model_type not in p_e_max.keys():
+            p_e_max[model_type] = [np.nan for comb in tbl_dc_combs]
 
-            try:
-                p_e_mean = pd.read_csv(mean_e_path)
-            except Exception:
-                p_e_mean = pd.DataFrame({
-                    dc_combs_col_name: [comb for comb in tbl_dc_combs]
-                })
+        try:
+            pr = pd.read_csv(r_path)
+            assert pr.shape[0] == len(tsteps), 'The dataset size has changed, the statistics table will be rewritten!'
 
-            if model_type not in p_e_mean.keys():
-                p_e_mean[model_type] = [np.nan for comb in tbl_dc_combs]
-
-            try:
-                p_e_min = pd.read_csv(min_e_path)
-            except:
-                p_e_min = pd.DataFrame({
-                    dc_combs_col_name: [comb for comb in tbl_dc_combs]
-                })
-
-            if model_type not in p_e_min.keys():
-                p_e_min[model_type] = [np.nan for comb in tbl_dc_combs]
-
-            try:
-                p_e_max = pd.read_csv(max_e_path)
-            except:
-                p_e_max = pd.DataFrame({
-                    dc_combs_col_name: [comb for comb in tbl_dc_combs]
-                })
-
-            if model_type not in p_e_max.keys():
-                p_e_max[model_type] = [np.nan for comb in tbl_dc_combs]
-
-            try:
-                pr = pd.read_csv(r_path)
-                assert pr.shape[0] == len(tsteps), 'The dataset size has changed, the statistics table will be rewritten!'
-
-            except:
-                pr = pd.DataFrame({
-                    ts_key: [value for value in tsteps],
-                    br_key: [value for value in reals],
-                })
+        except:
+            pr = pd.DataFrame({
+                ts_key: [value for value in tsteps],
+                br_key: [value for value in reals],
+            })
 
         # update prediction results
 
         if args.update:
 
-            if ae:
-
-                assert model_dc_comb in tbl_dc_combs
-                idx = tbl_dc_combs.index(model_dc_comb)
-                auc_mean[model_type].values[idx] = np.mean(aucs)
-                auc_mean.to_csv(mean_a_path, index=None)
-
-            else:
-                assert model_dc_comb in tbl_dc_combs
-                idx = tbl_dc_combs.index(model_dc_comb)
-                p_e_mean[model_type].values[idx] = np.mean(mean_errors)
-                p_e_mean.to_csv(mean_e_path, index=None)
-                p_e_min[model_type].values[idx] = np.mean(min_errors)
-                p_e_min.to_csv(min_e_path, index=None)
-                p_e_max[model_type].values[idx] = np.mean(max_errors)
-                p_e_max.to_csv(max_e_path, index=None)
+            assert model_dc_comb in tbl_dc_combs
+            idx = tbl_dc_combs.index(model_dc_comb)
+            p_e_mean[model_type].values[idx] = np.mean(mean_errors)
+            p_e_mean.to_csv(mean_e_path, index=None)
+            p_e_min[model_type].values[idx] = np.mean(min_errors)
+            p_e_min.to_csv(min_e_path, index=None)
+            p_e_max[model_type].values[idx] = np.mean(max_errors)
+            p_e_max.to_csv(max_e_path, index=None)
 
             pr[model_name] = preds
             pr.to_csv(r_path, index=None)
