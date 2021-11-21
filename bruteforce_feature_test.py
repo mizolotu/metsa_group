@@ -155,7 +155,7 @@ if __name__ == '__main__':
             model_type = 'mlp'
         else:
             hidden = split(inputs_processed, nfeatures)
-            model_type = 'cnn1'
+            model_type = 'mlp'  # 'cnn1'
         extractor_type = locals()[model_type]
         hidden = extractor_type(hidden)
         model = model_output(inputs, hidden, br_key, ymin, ymax)
