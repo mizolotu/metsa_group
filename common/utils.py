@@ -20,8 +20,10 @@ def set_seeds(seed):
     tf.random.set_seed(seed)
     np.random.seed(seed)
 
-def load_data(fpath, tags):
-    df = pd.read_csv(fpath)
+def load_data(fpath, tags, dtype=None, nan_to_none=False):
+    df = pd.read_csv(fpath, dtype=dtype)
+    if nan_to_none:
+        df = df.where(pd.notnull(df), None)
     tags_without_ts = [key for key in df.keys() if key.split(f'_{series_step_prefix}')[0] in tags]
     values = df[tags_without_ts].values
     labels = df[br_key].values

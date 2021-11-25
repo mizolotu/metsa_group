@@ -5,66 +5,82 @@ import tensorflow as tf
 
 def init():
     global models, model_selector
-    model_dir = os.getenv('AZUREML_MODEL_DIR')
     model_names = {
-        1: 'production/cnn1_1',
-        2: 'production/cnn1_2',
-        3: 'production/cnn1_3',
-        4: 'production/cnn1_4',
-        5: 'production/cnn1_5'
+        1: 'production/mlp_1',
+        2: 'production/mlp_2',
+        3: 'production/mlp_3',
+        4: 'production/mlp_4',
+        5: 'production/mlp_5'
     }
     models = {}
     for key in model_names.keys():
-        models[key] = tf.keras.models.load_model(osp.join(model_dir, model_names[key]))
+        models[key] = tf.keras.models.load_model(osp.join(os.getenv('AZUREML_MODEL_DIR'), model_names[key]))
     model_selector = get_model_selector(models)
 
 def run(data):
     try:
-        samples = json.loads(data)
-        if type(samples) != list:
-            samples = [samples]
-        if len(samples) > 0:
-            results = []
-            status = 'ok'
-            for sample in samples:
-                try:
-                    model, dc = model_selector(sample)
-                    if model is not None:
-                        sample = adjust_input(sample, model)
-                        result = model.predict(sample)
-                        key = [key for key in result.keys()][0]
-                        value = result[key][0, 0].tolist()
-                        results.append({key: value, 'model': dc})
-                except:
-                    results.append({})
-                    status = 'error'
-            resp = {'result': results, 'status': status}
+        jdata = json.loads(data)
+        if 'dc' in jdata.keys() and jdata['dc'] in models.keys():
+            dc = jdata['dc']
+            model = models[dc]
         else:
-            resp = {'status': 'no input data provided', 'result': []}
+            model, dc = model_selector(jdata['cols'], jdata['rows'])
+        if model is not None:
+            prediction_key, predictions, errors = make_predictions(jdata['cols'], jdata['rows'], model)
+            resp = {'status': 'ok', prediction_key: predictions, 'errors': errors}
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        resp = {'status': f'exception {e} in {fname} at line {exc_tb.tb_lineno}', 'result': []}
+        resp = {'status': f'exception {e} in {fname} at line {exc_tb.tb_lineno}'}
     return resp
 
-def adjust_input(data, model):
+def make_predictions(cols, rows, model):
+
+    # prepare batch
+
+    x = {}
+    rows = np.array(rows)
     for key in model.input:
-        if key not in data or data[key] is None:
-            data[key] = np.array([np.nan])
-        elif type(data[key]) is not list:
-            data[key] = np.array([data[key]])
-    return data
+        if key not in cols:
+            x[key] = np.array([np.nan for _ in rows])
+        else:
+            idx = cols.index(key)
+            x[key] = np.array(rows[:, idx], dtype='float')
+    keys = list(model.output.keys())
+    assert len(keys) == 1
+    label_key = keys[0]
+    if label_key in cols:
+        idx = cols.index(label_key)
+        y = np.array(rows[:, idx], dtype='float')
+    else:
+        y = []
+
+    # predict and process result
+
+    result = model.predict(x)
+    predictions = result[label_key][:, 0]
+    if len(y) > 0 and len(y) == len(predictions):
+        errors = np.abs(y - predictions).tolist()
+    else:
+        errors = [np.nan for _ in y]
+    return label_key, predictions.tolist(), errors
 
 def get_model_selector(models):
     keys = sorted(models.keys())
     model_additional_inputs = []
+    all_tags = []
     for key in keys:
         input = models[key].input
         new_tags = [key for key in input if key not in [item for sublist in model_additional_inputs for item in sublist]]
         model_additional_inputs.append(new_tags)
+        all_tags.extend(new_tags)
 
-    def model_selector(data):
-        non_nan_keys = [key for key in data.keys() if data[key] is not None and np.isnan(data[key]) == False]
+    def model_selector(cols, rows):
+        rows = np.array(rows)
+        non_nan_keys = []
+        for i, key in enumerate(all_tags):
+            if key in cols and np.any(rows[:, cols.index(key)] != None):
+                non_nan_keys.append(key)
         if len(non_nan_keys) > 0:
             remaining_keys = non_nan_keys.copy()
             for k, inputs in zip(keys, model_additional_inputs):
