@@ -28,7 +28,6 @@ anomaly_detection_results_fname = 'anomaly_detection_results.csv'
 anomaly_detection_mean_aucs_fname = 'anomaly_detection_mean_aucs.csv'
 
 summary_txt = 'summary.txt'
-test_samples_fname = '2021-11-14T032858-2021-11-18T063225.csv'
 
 # data
 

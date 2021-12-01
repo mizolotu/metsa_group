@@ -58,6 +58,10 @@ def insert_data_row(table_pointer, conn, sample):
     ins = table_pointer.insert()
     conn.execute(ins.values(sample))
 
+def insert_data_batch(table_pointer, conn, batch):
+    ins = table_pointer.insert()
+    conn.execute(ins, batch)
+
 def select_last_data_rows(db_connection, table_pointer, timestamp_column, n=10):
     sel = table_pointer.select(limit=n, order_by=sqlalchemy.Column(timestamp_column).desc())
     result = db_connection.execute(sel)
