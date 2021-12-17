@@ -24,7 +24,7 @@ def plot_line(x, y, marker, xlabel, ylabel, fpath):
     pp.savefig(fpath, bbox_inches='tight')
     pp.close()
 
-def plot_multiple_bars(items, heights, hatches, figh, xlabel, ylabel, legend_items, legend_names, fpath, xticks_rotation='horizontal', plot_png=False, width=0.1):
+def plot_multiple_bars(items, heights, hatches, figh, xlabel, ylabel, legend_items, legend_names, fpath, xticks_rotation='horizontal', plot_png=True, width=0.1):
     pp.figure(figsize=(21.2, figh))
     x = 1 + np.arange(len(items))
     steps = np.arange(len(items)) * width
@@ -42,7 +42,7 @@ def plot_multiple_bars(items, heights, hatches, figh, xlabel, ylabel, legend_ite
         pp.savefig(fpath, bbox_inches='tight')
     pp.close()
 
-def plot_bars(items, heights, hatches, items_for_argsort, figh, xlabel, ylabel, legend_items, legend_names, fpath, sort=False, reverse=True, xticks_rotation='horizontal', plot_png=False, figw=21.2, nan_mask=0):
+def plot_bars(items, heights, hatches, items_for_argsort, figh, xlabel, ylabel, legend_items, legend_names, fpath, sort=False, reverse=True, xticks_rotation='horizontal', plot_png=True, figw=21.2, nan_mask=0):
     non_nan_idx = np.where(~pd.isna(heights))
     heights[np.where(pd.isna(heights))] = nan_mask
     ydelta = np.max(heights[non_nan_idx]) - np.min(heights[non_nan_idx])
