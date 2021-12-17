@@ -32,7 +32,7 @@ python3 train_prediction_models.py -e <feature extractor, e.g. mlp> -m <mode: de
 
 3. Deploy the model on Azure using ```scoring.py``` as the entry script and ```environment.yml``` as the dependencies file.
 
-### Calculate feature importance (this code is now a bit broken, fixing now...)
+### Calculate feature importance
 
 1. Calculate feature correlation with the target variable:
 
