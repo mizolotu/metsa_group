@@ -13,7 +13,7 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Plot feature values')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-f', '--feature', help='Feature to plot', default='126A0546-QI1')  # 126A0546-QI1 126A0103-QI_A1 126A0228-FIC_A3 126A0503-QI_A2
+    parser.add_argument('-f', '--feature', help='Feature to plot', default='126A0252-QI')  # 126A0546-QI1 126A0103-QI_A1 126A0503-QI_A2 126A0252-QI 126A0317-QI.A1 126A0436-WIC
     parser.add_argument('-s', '--size', help='Fgiure size', default=12, type=int)
     parser.add_argument('-y', '--target', help='Target to plot feature against', default=br_key)
     parser.add_argument('-p', '--permute', help='Plot feature permuted?', type=bool, default=False)

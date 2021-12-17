@@ -16,8 +16,8 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train prediction models')
     parser.add_argument('-t', '--task', help='Task', default='predict_bleach_ratio')
-    parser.add_argument('-e', '--extractor', help='Feature extractor', choices=['mlp', 'cnn1', 'cnn1lstm', 'lstm', 'bilstm'])
-    parser.add_argument('-c', '--classes', help='Delay class when prediction starts', type=int, nargs='+', default=[4, 5])
+    parser.add_argument('-e', '--extractor', help='Feature extractor', default='mlp', choices=['mlp', 'cnn1', 'cnn1lstm', 'lstm', 'bilstm'])
+    parser.add_argument('-c', '--classes', help='Delay class when prediction starts', type=int, nargs='+', default=[1, 2, 3, 4, 5])
     parser.add_argument('-s', '--seed', help='Starting seed', type=int, default=seed)
     parser.add_argument('-g', '--gpu', help='GPU to use', default='0')
     parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
