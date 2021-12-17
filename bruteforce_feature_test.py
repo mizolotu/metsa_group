@@ -19,7 +19,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--seed', help='Seed', type=int, default=0)
     parser.add_argument('-g', '--gpu', help='GPU to use', default='0')
     parser.add_argument('-v', '--verbose', help='Verbose', default=False, type=bool)
-    parser.add_argument('-e', '--evalmethod', help='Evaluation method', choices=['selected', 'not-selected', 'permuted'], default='not-selected')
+    parser.add_argument('-e', '--evalmethod', help='Evaluation method', choices=['not-selected', 'permuted'], default='not-selected')
     parser.add_argument('-d', '--delay', help='Delay class', default=4, type=int)
     parser.add_argument('-n', '--ntests', help='Number of tests', default=3, type=int)
     args = parser.parse_args()
